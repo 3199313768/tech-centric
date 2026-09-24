@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { WorkflowDocument, WorkflowNode } from './types'
 import { advanceWorkflow, cancelWorkflow, getRunProgress, resolveWaiting, startWorkflow } from './runtime'
 
-function makeNode(id: string, kind: WorkflowNode['kind'], subtype: string, outputs = [{ id: 'out', name: '下一步', dataType: 'json' as const }]): WorkflowNode {
+function makeNode(id: string, kind: WorkflowNode['kind'], subtype: string, outputs: WorkflowNode['outputs'] = [{ id: 'out', name: '下一步', dataType: 'json' }]): WorkflowNode {
   return {
     id,
     kind,
