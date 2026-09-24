@@ -10670,6 +10670,8 @@ svg {
 .sg-workflow-color--slate { background: var(--sg-ink); }
 .sg-workflow-inspector__notice, .sg-workflow-run-block { margin: 0.85rem 0 0; padding: 0.65rem 0.7rem; border-left: 2px solid var(--sg-accent); color: var(--sg-ink); background: color-mix(in srgb, var(--sg-accent) 12%, transparent); font-size: 0.72rem; line-height: 1.5; }
 .sg-workflow-inspector__notice--muted { border-left-color: var(--sg-ink); background: color-mix(in srgb, var(--sg-ink) 7%, transparent); }
+.sg-workflow-inspector__ai-config { display: grid; gap: 0.75rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid color-mix(in srgb, var(--sg-ink) 11%, transparent); }
+.sg-workflow-inspector__section-title { color: var(--sg-ink-strong); font-size: 0.74rem; font-weight: 700; }
 .sg-workflow-run-block { position: absolute; right: 1rem; bottom: 1rem; left: 1rem; z-index: 8; border-left-color: var(--sg-workflow-error); background: color-mix(in srgb, var(--sg-workflow-error) 10%, var(--sg-cream)); }
 .sg-workflow-player { display: grid; align-content: start; gap: 1.25rem; min-height: 0; overflow-y: auto; padding: clamp(1.25rem, 4vw, 3rem); background: color-mix(in srgb, var(--sg-cream) 88%, var(--sg-parchment)); }
 .sg-workflow-player__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding-bottom: 1rem; border-bottom: 1px solid color-mix(in srgb, var(--sg-ink) 11%, transparent); }
@@ -10682,6 +10684,8 @@ svg {
 .sg-workflow-player__state { display: flex; flex-wrap: wrap; align-items: center; gap: 0.55rem; color: var(--sg-ink); font-size: 0.8rem; }
 .sg-workflow-player__status { display: inline-flex; align-items: center; min-height: 1.6rem; padding: 0.25rem 0.5rem; border-radius: 0.25rem; color: var(--sg-ink-strong); background: color-mix(in srgb, var(--sg-green-light) 32%, transparent); font-size: 0.7rem; font-weight: 700; }
 .sg-workflow-player__status--failed { color: var(--sg-workflow-error); background: color-mix(in srgb, var(--sg-workflow-error) 10%, transparent); }
+.sg-workflow-player__status--executing, .sg-workflow-player__status--retrying { color: var(--sg-ink-strong); background: color-mix(in srgb, var(--sg-accent) 14%, transparent); }
+.sg-workflow-player__status--retrying { color: var(--sg-green-deep); background: color-mix(in srgb, var(--sg-green-light) 42%, transparent); }
 .sg-workflow-player__status--cancelled { background: color-mix(in srgb, var(--sg-ink) 9%, transparent); }
 .sg-workflow-player__waiting { display: grid; gap: 0.9rem; padding: 1rem; border: 1px solid color-mix(in srgb, var(--sg-green-mid) 30%, transparent); border-radius: 0.45rem; background: color-mix(in srgb, var(--sg-cream) 94%, transparent); }
 .sg-workflow-player__waiting h3 { margin: 0; color: var(--sg-ink-strong); font-size: 0.95rem; line-height: 1.5; }

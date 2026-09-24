@@ -97,6 +97,18 @@ function routeToNext(run: WorkflowRun, workflow: WorkflowDocument, node: Workflo
   return withTimestamp(run, { status: 'running', currentNodeId: edge.target.nodeId, nextPortId: null, waiting: null, error: null })
 }
 
+export function retryWorkflowNode(run: WorkflowRun): WorkflowRun {
+  if (run.status !== 'failed' || !run.currentNodeId) return run
+  return withTimestamp(run, { status: 'running', waiting: null, nextPortId: null, error: null })
+}
+
+export function followWorkflowError(run: WorkflowRun, workflow: WorkflowDocument): WorkflowRun {
+  if (run.status !== 'failed' || !run.currentNodeId) return run
+  const edge = getOutgoingEdge(workflow, run.currentNodeId, 'error')
+  if (!edge) return run
+  return withTimestamp(run, { status: 'running', currentNodeId: edge.target.nodeId, nextPortId: null, waiting: null, error: null })
+}
+
 export function startWorkflow(workflow: WorkflowDocument, inputs: WorkflowValueMap): WorkflowRun {
   const timestamp = now()
   const entryNodeId = workflow.settings.entryNodeId

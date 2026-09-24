@@ -33,12 +33,12 @@ function safeError(payload: unknown, fallback: string): string {
   return fallback
 }
 
-export async function executeWorkflowNode(input: WorkflowNodeExecutionInput): Promise<WorkflowNodeExecutionResult> {
+export async function executeWorkflowNode(input: WorkflowNodeExecutionInput, signal?: AbortSignal): Promise<WorkflowNodeExecutionResult> {
   try {
     const response = await fetch('/api/admin/workflows/execute', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      signal: input.signal,
+      signal: signal ?? input.signal,
       body: JSON.stringify({
         workflowId: input.workflow.id,
         runId: input.run.id,

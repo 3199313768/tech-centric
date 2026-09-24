@@ -33,6 +33,7 @@ function createPorts(kind: WorkflowNodeKind, subtype: string): { inputs: Workflo
       ],
     }
   }
+  if (kind === 'ai') return { inputs, outputs: [{ id: 'out', name: '成功', dataType: 'json' }, { id: 'error', name: '错误', dataType: 'json' }] }
   return { inputs, outputs: [{ id: 'out', name: '下一步', dataType: 'json' }] }
 }
 

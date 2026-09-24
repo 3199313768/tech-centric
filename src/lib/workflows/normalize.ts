@@ -65,6 +65,9 @@ function defaultPorts(kind: WorkflowNodeKind, subtype: string): { inputs: Workfl
       { id: 'no', name: '否', dataType: 'boolean' },
     ] }
   }
+  if (kind === 'ai') {
+    return { inputs, outputs: [{ id: 'out', name: '成功', dataType: 'json' }, { id: 'error', name: '错误', dataType: 'json' }] }
+  }
   return { inputs, outputs: [{ id: 'out', name: '下一步', dataType: 'json' }] }
 }
 

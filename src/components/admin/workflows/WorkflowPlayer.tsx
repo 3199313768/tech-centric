@@ -17,9 +17,13 @@ interface WorkflowPlayerProps {
   onRetrySave: () => void
   saveError: Error | null
   executionStatus: WorkflowAsyncStatus | null
+  canFollowErrorBranch: boolean
+  canRetryCurrentNode: boolean
+  onRetryCurrentNode: () => void
+  onFollowErrorBranch: () => void
 }
 
-export function WorkflowPlayer({ workflow, run, recoverableRuns, onStart, onResolve, onResume, onCancel, onRetrySave, saveError, executionStatus }: WorkflowPlayerProps) {
+export function WorkflowPlayer({ workflow, run, recoverableRuns, onStart, onResolve, onResume, onCancel, onRetrySave, saveError, executionStatus, canFollowErrorBranch, canRetryCurrentNode, onRetryCurrentNode, onFollowErrorBranch }: WorkflowPlayerProps) {
   const [inputValue, setInputValue] = useState('')
   const progress = useMemo(() => run ? getRunProgress(run, workflow) : null, [run, workflow])
   const waiting = run?.waiting ?? null
@@ -56,6 +60,8 @@ export function WorkflowPlayer({ workflow, run, recoverableRuns, onStart, onReso
             {waiting.kind === 'select' ? <div className="sg-workflow-player__options">{(waiting.options ?? [{ value: 'yes', label: '是' }, { value: 'no', label: '否' }]).map((option) => <button type="button" className="sg-btn sg-btn--ghost" key={option.value} onClick={() => onResolve(option.value)} disabled={isBusy}>{option.label}</button>)}</div> : null}
           </div> : null}
           {run.status === 'running' && !isBusy ? <button type="button" className="sg-btn sg-btn--primary" onClick={() => onResume(run.id)}><Play aria-hidden size={15} />继续运行</button> : null}
+          {run.status === 'failed' && canRetryCurrentNode && !isBusy ? <button type="button" className="sg-btn sg-btn--primary" onClick={onRetryCurrentNode}><RotateCcw aria-hidden size={15} />重试当前节点</button> : null}
+          {run.status === 'failed' && canFollowErrorBranch && !isBusy ? <button type="button" className="sg-btn sg-btn--ghost" onClick={onFollowErrorBranch}>走错误分支</button> : null}
           {run.status === 'completed' || run.status === 'failed' || run.status === 'cancelled' ? <button type="button" className="sg-btn sg-btn--ghost" onClick={() => onStart({})} disabled={isBusy}><RotateCcw aria-hidden size={15} />开始新运行</button> : null}
           {isActive ? <button type="button" className="sg-btn sg-btn--ghost" onClick={onCancel} disabled={isBusy}>取消运行</button> : null}
           {run.error ? <p className="sg-workflow-player__error" role="alert">{run.error}</p> : null}

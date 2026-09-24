@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { advanceWorkflowAsync, startWorkflow } from './runtime'
+import { advanceWorkflowAsync, followWorkflowError, retryWorkflowNode, startWorkflow } from './runtime'
 import type { WorkflowDocument, WorkflowNode } from './types'
 
 function makeWorkflow(): WorkflowDocument {
@@ -16,5 +16,13 @@ describe('advanceWorkflowAsync', () => {
     expect(result.variables).toEqual({ summary: 'done' })
     expect(execute).toHaveBeenCalledTimes(2)
     expect(statuses).toEqual(['executing', 'retrying'])
+  })
+
+  it('resets a failed AI node without replaying history and follows an explicit error edge', () => {
+    const workflow = makeWorkflow()
+    const failed = { ...startWorkflow(workflow, {}), status: 'failed' as const, error: 'temporary' }
+    expect(retryWorkflowNode(failed)).toMatchObject({ status: 'running', currentNodeId: 'ai', error: null })
+    const target = { ...workflow, nodes: [...workflow.nodes, { ...workflow.nodes[0], id: 'fallback', kind: 'thinking' as const, execution: { mode: 'manual' as const } }], edges: [{ id: 'error', source: { nodeId: 'ai', portId: 'error' }, target: { nodeId: 'fallback', portId: 'out' } }] }
+    expect(followWorkflowError(failed, target)).toMatchObject({ status: 'running', currentNodeId: 'fallback', error: null })
   })
 })
