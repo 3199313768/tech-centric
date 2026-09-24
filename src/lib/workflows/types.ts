@@ -4,7 +4,32 @@ export type WorkflowNodeColor = 'green' | 'gold' | 'rose' | 'blue' | 'slate'
 export type WorkflowExecutionMode = 'manual' | 'configured' | 'disabled'
 export type WorkflowExecutionProvider = 'ai' | 'http' | 'database' | 'file' | 'webhook'
 
-export type WorkflowValue = string | number | boolean | null
+export type WorkflowJsonValue = string | number | boolean | null | WorkflowJsonValue[] | { [key: string]: WorkflowJsonValue }
+export type WorkflowJsonObject = { [key: string]: WorkflowJsonValue }
+
+export type WorkflowAiConfig = {
+  provider: 'deepseek'
+  systemPrompt: string
+  promptTemplate: string
+  temperature: number
+  responseFormat: 'text' | 'json'
+  outputVariable: string
+  maxRetries: number
+  timeoutMs: number
+}
+
+export type WorkflowExecutionStatus = 'idle' | 'executing' | 'retrying'
+
+export type WorkflowExecutionAttempt = {
+  nodeId: string
+  status: 'success' | 'failed'
+  attempt: number
+  retryable: boolean
+  error: string | null
+  at: string
+}
+
+export type WorkflowValue = WorkflowJsonValue
 export type WorkflowValueMap = Record<string, WorkflowValue>
 
 export type WorkflowRunStatus = 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled'
@@ -78,7 +103,7 @@ export interface WorkflowNode {
   title: string
   description: string
   color: WorkflowNodeColor
-  config: Record<string, string | boolean | number>
+  config: WorkflowJsonObject
   inputs: WorkflowPort[]
   outputs: WorkflowPort[]
   execution: WorkflowNodeExecution

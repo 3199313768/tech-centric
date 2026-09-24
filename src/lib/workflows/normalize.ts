@@ -1,5 +1,6 @@
 import type {
   WorkflowCanvasMetadata,
+  WorkflowAiConfig,
   WorkflowDocument,
   WorkflowEdge,
   WorkflowNode,
@@ -8,6 +9,8 @@ import type {
   WorkflowPort,
   WorkflowPortDataType,
   WorkflowVariable,
+  WorkflowJsonObject,
+  WorkflowJsonValue,
 } from './types'
 
 const MIN_ZOOM = 0.35
@@ -65,13 +68,58 @@ function defaultPorts(kind: WorkflowNodeKind, subtype: string): { inputs: Workfl
   return { inputs, outputs: [{ id: 'out', name: '下一步', dataType: 'json' }] }
 }
 
-function normalizeConfig(value: unknown): Record<string, string | boolean | number> {
+function normalizeJsonValue(value: unknown, depth = 0): WorkflowJsonValue | undefined {
+  if (depth > 4) return undefined
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (Array.isArray(value)) {
+    return value.slice(0, 32).map((item) => normalizeJsonValue(item, depth + 1)).filter((item): item is WorkflowJsonValue => item !== undefined)
+  }
   const record = asRecord(value)
-  if (!record) return {}
-  return Object.entries(record).reduce<Record<string, string | boolean | number>>((result, [key, item]) => {
-    if (typeof item === 'string' || typeof item === 'boolean' || (typeof item === 'number' && Number.isFinite(item))) result[key] = item
+  if (!record) return undefined
+  return Object.entries(record).slice(0, 64).reduce<WorkflowJsonObject>((result, [key, item]) => {
+    const normalized = normalizeJsonValue(item, depth + 1)
+    if (normalized !== undefined) result[key] = normalized
     return result
   }, {})
+}
+
+function normalizeConfig(value: unknown): WorkflowJsonObject {
+  const record = asRecord(value)
+  if (!record) return {}
+  return Object.entries(record).slice(0, 64).reduce<WorkflowJsonObject>((result, [key, item]) => {
+    const normalized = normalizeJsonValue(item)
+    if (normalized !== undefined) result[key] = normalized
+    return result
+  }, {})
+}
+
+const SAFE_VARIABLE_NAME = /^[A-Za-z_][A-Za-z0-9_.-]{0,63}$/
+
+function boundedNumber(value: unknown, fallback: number, min: number, max: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : fallback
+}
+
+function boundedText(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value.slice(0, 8000) : fallback
+}
+
+export function normalizeWorkflowAiConfig(input: unknown): WorkflowAiConfig | null {
+  const record = asRecord(input)
+  if (!record || record.provider !== 'deepseek') return null
+  const promptTemplate = boundedText(record.promptTemplate)
+  if (!promptTemplate.trim()) return null
+  const rawOutputVariable = boundedText(record.outputVariable, 'ai_output').trim()
+  return {
+    provider: 'deepseek',
+    systemPrompt: boundedText(record.systemPrompt),
+    promptTemplate,
+    temperature: boundedNumber(record.temperature, 0.2, 0, 2),
+    responseFormat: record.responseFormat === 'json' ? 'json' : 'text',
+    outputVariable: SAFE_VARIABLE_NAME.test(rawOutputVariable) ? rawOutputVariable : 'ai_output',
+    maxRetries: Math.floor(boundedNumber(record.maxRetries, 2, 0, 2)),
+    timeoutMs: Math.floor(boundedNumber(record.timeoutMs, 30_000, 5_000, 60_000)),
+  }
 }
 
 function normalizeNode(value: unknown, index: number): WorkflowNode | null {
