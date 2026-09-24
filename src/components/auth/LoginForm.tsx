@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { resolveLoginEmail } from '@/lib/auth/loginIdentity'
@@ -19,6 +20,7 @@ export function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
+  const resetSuccess = searchParams.get('reset') === 'success'
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -58,6 +60,12 @@ export function LoginForm() {
       <h1 className="sg-login-form__title">登录</h1>
       <p className="sg-login-form__subtitle">使用管理员下发的账号进入庭院</p>
 
+      {resetSuccess ? (
+        <div className="sg-login-form__success" role="status" aria-live="polite">
+          密码已更新，请使用新密码登录
+        </div>
+      ) : null}
+
       <form className="sg-login-form__fields" onSubmit={handleLogin}>
         <div className="sg-form-field">
           <label className="sg-form-label" htmlFor="login-account">
@@ -88,6 +96,10 @@ export function LoginForm() {
             autoComplete="current-password"
           />
         </div>
+
+        <Link className="sg-login-form__link" href="/forgot-password">
+          忘记密码
+        </Link>
 
         {error ? (
           <div className="sg-kb-error sg-kb-error--inline" role="alert">

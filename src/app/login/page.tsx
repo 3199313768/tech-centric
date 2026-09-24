@@ -30,7 +30,7 @@ export default function LoginPage() {
         <div className="sg-login-brand__veil" aria-hidden />
         <div className="sg-login-brand__content sg-login-enter sg-login-enter--0">
           <Image
-            src="/spirit-garden/logo.png"
+            src="/spirit-garden/个人信使图标-彩色.png"
             alt=""
             width={48}
             height={48}

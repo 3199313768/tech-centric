@@ -59,7 +59,7 @@ export function MessageBubble({ message, onAction, onCopy }: MessageBubbleProps)
   return (
     <div className="sg-rag-row sg-rag-row--assistant">
       <Image
-        src="/spirit-garden/rag-guide-sprite.webp"
+        src="/spirit-garden/个人信使角色-透明底.png"
         alt=""
         width={28}
         height={28}

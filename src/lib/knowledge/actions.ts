@@ -4,8 +4,11 @@ import { revalidatePath } from 'next/cache'
 import { requireSuperAdmin } from '@/lib/auth/requireUser'
 import { createClient } from '@/lib/supabase/server'
 import type { KbRecord } from '@/lib/knowledge/types'
+import { isKbRecordType } from '@/lib/knowledge/constants'
 import { scheduleRagReindex } from '@/lib/rag/reindexTrigger'
 import { knowledgePublicRoute } from '@/lib/site/routes'
+
+const INVALID_RECORD_TYPE_ERROR = '类型必须是笔记、代码、图片或附件'
 
 export async function deleteKbRecord(recordId: string): Promise<{ error: string | null }> {
   const { user, error: authError } = await requireSuperAdmin()
@@ -37,6 +40,7 @@ export async function updateKbRecord(
 ): Promise<{ error: string | null }> {
   const { user, error: authError } = await requireSuperAdmin()
   if (authError || !user) return { error: authError ?? '请先登录' }
+  if (!isKbRecordType(input.type)) return { error: INVALID_RECORD_TYPE_ERROR }
 
   const supabase = await createClient()
   const { error } = await supabase
@@ -67,6 +71,7 @@ export async function createKbRecord(input: {
 }): Promise<{ error: string | null; record?: KbRecord }> {
   const { user, error: authError } = await requireSuperAdmin()
   if (authError || !user) return { error: authError ?? '请先登录' }
+  if (!isKbRecordType(input.type)) return { error: INVALID_RECORD_TYPE_ERROR }
 
   const supabase = await createClient()
   const { data, error } = await supabase

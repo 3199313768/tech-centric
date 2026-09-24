@@ -3,6 +3,7 @@ import { Geist, JetBrains_Mono, Space_Mono, Quicksand, Plus_Jakarta_Sans, Noto_S
 import "./globals.css";
 import { personalInfo } from "@/data/site/personal";
 import { ThemeProvider } from '@/components/spirit/theme/ThemeProvider'
+import { SpiritCursorLayer } from '@/components/spirit/shell/SpiritCursorLayer'
 import { QuickRecordModal } from '@/components/knowledge/capture/QuickRecordModal'
 import { ToastProvider } from '@/components/spirit/feedback/ToastProvider'
 import { getSessionProfile } from '@/lib/auth/getSessionProfile'
@@ -67,8 +68,8 @@ export const metadata: Metadata = {
     images: ['/spirit-garden/hero-landscape.png'],
   },
   icons: {
-    icon: '/spirit-garden/logo.png',
-    apple: '/spirit-garden/logo.png',
+    icon: '/spirit-garden/个人信使图标-彩色.png',
+    apple: '/spirit-garden/个人信使图标-彩色.png',
   },
 };
 
@@ -94,11 +95,11 @@ export default async function RootLayout({
           attribute="class"
           defaultTheme="system"
           enableSystem
-          disableTransitionOnChange
         >
           <ToastProvider>
             {children}
             {profile?.role === SITE_ROLE.super_admin ? <QuickRecordModal /> : null}
+            <SpiritCursorLayer />
           </ToastProvider>
         </ThemeProvider>
       </body>

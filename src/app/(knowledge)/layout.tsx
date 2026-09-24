@@ -23,7 +23,6 @@ export default async function KnowledgeLayout({
           email={state.profile.user.email ?? ''}
         />
       }
-      role={state.profile.role}
     >
       {children}
     </SpiritAtmosphereShell>

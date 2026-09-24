@@ -19,7 +19,6 @@ export function SiteShell({ children, role, email }: SiteShellProps) {
   return (
     <SpiritAtmosphereShell
       variant={isHome ? 'home' : 'default'}
-      role={role}
       nav={<Navigation transparent={isHome} role={role} email={email} />}
     >
       {children}

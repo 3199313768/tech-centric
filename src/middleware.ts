@@ -3,7 +3,7 @@ import { updateSession } from '@/lib/supabase/middleware'
 import { isSafeNextPath } from '@/lib/auth/roles'
 import { SITE_ROUTES } from '@/lib/site/routes'
 
-const PUBLIC_PREFIXES = ['/login', '/auth'] // auth callback 预留
+const PUBLIC_PREFIXES = ['/login', '/forgot-password', '/reset-password', '/auth']
 
 export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl
@@ -35,6 +35,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|glb|gltf)$).*)',
   ],
 }

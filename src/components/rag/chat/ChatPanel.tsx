@@ -359,7 +359,7 @@ export function ChatPanel() {
       <div className="sg-rag-panel__header">
         <div className="sg-rag-panel__avatar sg-rag-panel__avatar--sprite">
           <Image
-            src="/spirit-garden/rag-guide-sprite.webp"
+            src="/spirit-garden/个人信使角色-透明底.png"
             alt=""
             width={36}
             height={36}
@@ -383,7 +383,7 @@ export function ChatPanel() {
             <div className="sg-rag-welcome">
               <div className="sg-rag-welcome__illustration" data-testid="rag-welcome-illustration">
                 <Image
-                  src="/spirit-garden/rag-guide-welcome.webp"
+                  src="/spirit-garden/个人信使角色-透明底.png"
                   alt=""
                   fill
                   sizes="(max-width: 640px) calc(100vw - 48px), 336px"

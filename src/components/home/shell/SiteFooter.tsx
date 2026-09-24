@@ -5,7 +5,6 @@ import { personalInfo } from '@/data/site/personal'
 
 export function SiteFooter({ role }: { role: SiteRole }) {
   const tabs = getMainNavTabsForRole(role)
-  const email = personalInfo.socialLinks.email?.replace(/^mailto:/, '') ?? ''
 
   return (
     <footer className="sg-footer sg-footer--garden">
@@ -21,11 +20,6 @@ export function SiteFooter({ role }: { role: SiteRole }) {
           ))}
         </nav>
         <div className="sg-footer-social">
-          {email ? (
-            <a href={`mailto:${email}`} className="sg-footer-email" aria-label={`发送邮件至 ${email}`}>
-              {email}
-            </a>
-          ) : null}
           {personalInfo.socialLinks.github ? (
             <a
               href={personalInfo.socialLinks.github}

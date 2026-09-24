@@ -59,7 +59,7 @@ export function Navigation({ transparent = false, role, email }: NavigationProps
           aria-label="返回首页"
           onClick={closeMenu}
         >
-          <Image src="/spirit-garden/logo.png" alt="" width={40} height={40} />
+          <Image src="/spirit-garden/个人信使图标-彩色.png" alt="" width={40} height={40} />
           <span className="max-md:hidden">SpiritGarden</span>
         </Link>
 
