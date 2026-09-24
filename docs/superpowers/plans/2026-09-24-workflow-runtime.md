@@ -31,6 +31,7 @@
 - Create: `src/lib/workflows/runPersistence.ts` — 运行快照防抖保存协调器，复用第一阶段的竞态保护模式。
 - Create: `src/lib/workflows/runPersistence.test.ts` — 旧请求保护、失败重试和 dispose 测试。
 - Create: `src/components/admin/workflows/WorkflowPlayer.tsx` — 运行播放器、人工等待控件、进度、恢复和取消操作。
+- Modify: `src/components/admin/workflows/WorkflowSidebar.tsx` — 保留人工确认/输入入口并增加人工选择节点入口。
 - Modify: `src/components/admin/workflows/WorkflowWorkbench.tsx` — 读取/保存 `workflow_runs`，在运行模式挂载播放器，保持编辑/预览状态独立。
 - Modify: `src/app/admin/workflows/page.tsx` — 归一化并传递 `user_metadata.workflow_runs`。
 - Modify: `src/components/admin/WorkflowWorkbench.test.ts` — 增加播放器挂载与独立 metadata 字段源码契约。
@@ -155,7 +156,7 @@ Expected: FAIL with missing runtime functions.
 
 - [ ] **Step 3: Implement start and deterministic advancement**
 
-Validate `settings.entryNodeId` in `startWorkflow`; initialize `running`, empty variables, empty history, and timestamps. In `advanceWorkflow`, find the current node, append completed history for directly passable manual nodes, create `waiting` state for human subtypes `input`, `confirm`, and `select`, and create fixed `yes`/`no` options for `control/decision`. Select the next edge by output port, treat no outgoing edge as `completed`, and return a failure with the node title for external providers or invalid graph references.
+Validate `settings.entryNodeId` in `startWorkflow`; initialize `running`, empty variables, empty history, and timestamps. In `advanceWorkflow`, find the current node, append completed history for directly passable manual nodes, create `waiting` state for human subtypes `input`, `approval` (the existing canvas subtype for confirmation), and `select`, and create fixed `yes`/`no` options for `control/decision`. Select the next edge by output port, treat no outgoing edge as `completed`, and return a failure with the node title for external providers or invalid graph references.
 
 - [ ] **Step 4: Implement response validation and cancellation**
 
@@ -270,6 +271,7 @@ git commit -m "feat: integrate workflow runs into admin workbench"
 **Files:**
 - Create: `src/components/admin/workflows/WorkflowPlayer.tsx`
 - Create: `src/components/admin/workflows/WorkflowPlayer.test.ts`
+- Modify: `src/components/admin/workflows/WorkflowSidebar.tsx`
 - Modify: `src/components/admin/workflows/WorkflowWorkbench.tsx`
 
 **Interfaces:**
@@ -290,18 +292,22 @@ Expected: FAIL because the player component does not exist.
 
 Render an empty state with `开始运行`; render recoverable run summaries with `恢复运行`; render waiting input with a controlled field keyed to the waiting node; render confirm buttons; render select buttons with configured options or fixed “是/否”. Disable duplicate submissions while the workbench is saving, show status/error text inline, and keep the latest response in component state until the parent confirms persistence.
 
-- [ ] **Step 4: Mount player in run mode**
+- [ ] **Step 4: Add the human selection palette entry**
+
+Add `{ label: '人工选择', kind: 'human', subtype: 'select' }` beside the existing `人工确认` (`approval`) and `人工输入` (`input`) entries. Keep the existing node labels and drag data contract unchanged for the other palette items.
+
+- [ ] **Step 5: Mount player in run mode**
 
 In `WorkflowWorkbench`, render the player in the run surface and leave the canvas read-only. `onStart` creates a run and calls `advanceWorkflow`; `onResolve` calls `resolveWaiting` then `advanceWorkflow`; `onResume` loads the selected run without resetting it; `onCancel` calls `cancelWorkflow`. Save each resulting metadata snapshot through the independent coordinator.
 
-- [ ] **Step 5: Run focused tests and commit**
+- [ ] **Step 6: Run focused tests and commit**
 
 Run: `pnpm exec vitest run src/components/admin/workflows/WorkflowPlayer.test.ts src/components/admin/WorkflowWorkbench.test.ts src/lib/workflows`
 
 Expected: all player, workbench and runtime tests PASS.
 
 ```bash
-git add src/components/admin/workflows/WorkflowPlayer.tsx src/components/admin/workflows/WorkflowPlayer.test.ts src/components/admin/workflows/WorkflowWorkbench.tsx src/components/admin/WorkflowWorkbench.test.ts
+git add src/components/admin/workflows/WorkflowPlayer.tsx src/components/admin/workflows/WorkflowPlayer.test.ts src/components/admin/workflows/WorkflowSidebar.tsx src/components/admin/workflows/WorkflowWorkbench.tsx src/components/admin/WorkflowWorkbench.test.ts
 git commit -m "feat: add workflow player for human steps"
 ```
 
@@ -368,4 +374,3 @@ Run `git diff --check` and `git status --short`. Confirm only the intended Workf
 - [ ] **Step 4: Produce the handoff evidence**
 
 Report targeted unit tests, lint, typecheck, build, browser, and real Supabase metadata evidence as separate categories. State any environment blockers and list the commit hashes created by the implementation tasks.
-
