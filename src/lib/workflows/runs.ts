@@ -4,7 +4,7 @@ import type {
   WorkflowRunHistoryItem,
   WorkflowRunMetadata,
   WorkflowRunStatus,
-  WorkflowValue,
+  WorkflowJsonValue,
   WorkflowValueMap,
   WorkflowWaitingState,
 } from './types'
@@ -27,16 +27,28 @@ function validTimestamp(value: unknown, fallback: string): string {
   return typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : fallback
 }
 
-function primitiveValue(value: unknown): WorkflowValue | undefined {
+function jsonValue(value: unknown, depth = 0): WorkflowJsonValue | undefined {
+  if (depth > 4) return undefined
   if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
-  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (Array.isArray(value)) {
+    return value.slice(0, 32).map((item) => jsonValue(item, depth + 1)).filter((item): item is WorkflowJsonValue => item !== undefined)
+  }
+  const record = asRecord(value)
+  if (!record) return undefined
+  return Object.entries(record).slice(0, 64).reduce<Record<string, WorkflowJsonValue>>((result, [key, item]) => {
+    if (!/^[A-Za-z_][A-Za-z0-9_.-]{0,63}$/.test(key)) return result
+    const normalized = jsonValue(item, depth + 1)
+    if (normalized !== undefined) result[key] = normalized
+    return result
+  }, {})
 }
 
 function normalizeValueMap(value: unknown): WorkflowValueMap {
   const record = asRecord(value)
   if (!record) return {}
   return Object.entries(record).reduce<WorkflowValueMap>((result, [key, item]) => {
-    const normalized = primitiveValue(item)
+    const normalized = jsonValue(item)
     if (normalized !== undefined) result[key] = normalized
     return result
   }, {})

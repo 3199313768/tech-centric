@@ -171,7 +171,7 @@ export function WorkflowWorkbench({ initialMetadata, initialRuns, userId }: Work
     setSelectedNodeIds([])
   }
 
-  const handleUpdateNode = (nodeId: string, patch: Partial<Pick<WorkflowNode, 'title' | 'description' | 'color' | 'execution'>>) => {
+  const handleUpdateNode = (nodeId: string, patch: Partial<Pick<WorkflowNode, 'title' | 'description' | 'color' | 'execution' | 'config'>>) => {
     if (readOnly || !activeWorkflow) return
     updateActiveWorkflow(updateNode(activeWorkflow, nodeId, patch))
   }

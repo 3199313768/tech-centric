@@ -31,6 +31,9 @@ describe('admin workflow entry', () => {
     for (const label of ['名称', '说明', '类型', '执行方式']) {
       expect(workbenchSources).toContain(label)
     }
+    for (const label of ['系统提示词', 'Prompt 模板', '输出格式', '输出变量', '温度', '最大重试', '超时']) {
+      expect(workbenchSources).toContain(label)
+    }
   })
 
   it('exposes stable canvas controls and connection anchors', () => {

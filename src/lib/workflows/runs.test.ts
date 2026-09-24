@@ -60,4 +60,12 @@ describe('workflow run metadata', () => {
     expect(result.runs[0].status).toBe('waiting')
     expect(result.activeRunId).toBe(waitingRun.id)
   })
+
+  it('preserves bounded JSON outputs from AI nodes', () => {
+    const result = normalizeWorkflowRuns({
+      runs: [{ ...waitingRun, status: 'completed', currentNodeId: null, waiting: null, variables: { summary: { title: '发布', tags: ['产品'] } }, history: [{ nodeId, status: 'completed', output: { summary: { title: '发布' } }, at: waitingRun.updatedAt }] }],
+    }, [workflow])
+    expect(result.runs[0].variables).toEqual({ summary: { title: '发布', tags: ['产品'] } })
+    expect(result.runs[0].history[0].output).toEqual({ summary: { title: '发布' } })
+  })
 })
