@@ -49,6 +49,7 @@
 **Interfaces:**
 - Produces `WorkflowValue = string | number | boolean | null` and `WorkflowValueMap = Record<string, WorkflowValue>`.
 - Produces `WorkflowRunStatus`, `WorkflowWaitingState`, `WorkflowRunHistoryItem`, `WorkflowRun`, and `WorkflowRunMetadata` matching the approved specification.
+- `WorkflowRun` includes `nextPortId: string | null` so a resolved human response can select the next output without coupling `resolveWaiting` to React or the workflow graph.
 - Produces `normalizeWorkflowRuns(input: unknown, workflows: WorkflowDocument[]): WorkflowRunMetadata` that never throws.
 - Produces `saveWorkflowRuns(metadata: WorkflowRunMetadata, nextRun: WorkflowRun, maxRuns?: number): WorkflowRunMetadata` that upserts the run, updates `activeRunId`, and keeps active/waiting runs before bounded history.
 - Produces `getRecoverableRun(metadata, workflowId): WorkflowRun | null` that returns only `running` or `waiting` runs whose current node exists in the selected workflow.

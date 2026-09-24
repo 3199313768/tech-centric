@@ -73,6 +73,7 @@ type WorkflowRun = {
   workflowId: string
   status: WorkflowRunStatus
   currentNodeId: string | null
+  nextPortId: string | null
   inputs: WorkflowValueMap
   variables: WorkflowValueMap
   waiting: WorkflowWaitingState | null
@@ -158,4 +159,3 @@ type WorkflowRunMetadata = {
 - 管理员会话下创建含人工输入、确认、选择和判断分支的流程，验证暂停、恢复、取消和刷新后恢复。
 - 单独记录真实 Supabase metadata 写入证据。
 - Playwright/浏览器、定向单测、类型检查、构建和全量测试结果分开报告；浏览器或真实后端不可用时明确标注未验证。
-
