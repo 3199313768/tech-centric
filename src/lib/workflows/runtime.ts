@@ -10,6 +10,22 @@ import type {
 
 const DEFAULT_MAX_STEPS = 100
 
+export type WorkflowAsyncExecutionInput = {
+  workflow: WorkflowDocument
+  run: WorkflowRun
+  node: WorkflowNode
+  attempt: number
+  signal?: AbortSignal
+}
+
+export type WorkflowAsyncExecutionResult =
+  | { ok: true; output: WorkflowValue; variables: WorkflowValueMap }
+  | { ok: false; error: string; retryable: boolean }
+
+export type WorkflowAsyncExecutor = (input: WorkflowAsyncExecutionInput) => Promise<WorkflowAsyncExecutionResult>
+
+export type WorkflowAsyncStatus = 'executing' | 'retrying'
+
 function now(): string {
   return new Date().toISOString()
 }
@@ -56,6 +72,16 @@ function getWaitingState(node: WorkflowNode): WorkflowWaitingState | null {
 
 function isExternalNode(node: WorkflowNode): boolean {
   return node.kind === 'ai' || node.kind === 'system' || node.execution.mode === 'disabled' || (node.execution.mode === 'configured' && Boolean(node.execution.provider))
+}
+
+function isConfiguredAiNode(node: WorkflowNode): boolean {
+  return node.kind === 'ai' && node.execution.mode === 'configured' && node.execution.provider === 'ai'
+}
+
+function getMaxRetries(node: WorkflowNode): number {
+  const value = node.config.ai
+  if (typeof value !== 'object' || value === null || Array.isArray(value) || typeof value.maxRetries !== 'number' || !Number.isFinite(value.maxRetries)) return 0
+  return Math.min(2, Math.max(0, Math.floor(value.maxRetries)))
 }
 
 function appendHistory(run: WorkflowRun, nodeId: string, output?: WorkflowValueMap): WorkflowRun {
@@ -107,6 +133,51 @@ export function advanceWorkflow(run: WorkflowRun, workflow: WorkflowDocument, ma
       continue
     }
     if (isExternalNode(node)) return failRun(next, `节点「${node.title}」需要第三阶段的外部执行能力。`)
+    const waiting = getWaitingState(node)
+    if (waiting) return withTimestamp(next, { status: 'waiting', waiting, error: null })
+    next = appendHistory(next, node.id)
+    const routed = routeToNext(next, workflow, node, 'out')
+    if (routed.status === 'completed') return routed
+    next = routed
+  }
+  return failRun(next, `流程超过 ${limit} 步数上限，可能存在未收敛的循环。`)
+}
+
+export async function advanceWorkflowAsync(
+  run: WorkflowRun,
+  workflow: WorkflowDocument,
+  execute: WorkflowAsyncExecutor,
+  options: { maxSteps?: number; onStatus?: (status: WorkflowAsyncStatus, node: WorkflowNode, attempt: number) => void; signal?: AbortSignal } = {},
+): Promise<WorkflowRun> {
+  if (run.status !== 'running') return run
+  let next = run
+  const limit = Math.max(1, Math.floor(options.maxSteps ?? DEFAULT_MAX_STEPS))
+  for (let step = 0; step < limit; step += 1) {
+    const node = getNode(workflow, next.currentNodeId)
+    if (!node) return failRun(next, '当前运行节点不存在，流程无法继续。')
+    if (next.nextPortId) {
+      const routed = routeToNext(next, workflow, node, next.nextPortId)
+      if (routed.status === 'completed') return routed
+      next = routed
+      continue
+    }
+    if (isConfiguredAiNode(node)) {
+      const maxAttempts = getMaxRetries(node) + 1
+      let result: WorkflowAsyncExecutionResult | null = null
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        options.onStatus?.(attempt === 1 ? 'executing' : 'retrying', node, attempt)
+        result = await execute({ workflow, run: next, node, attempt, signal: options.signal })
+        if (result.ok || !result.retryable || attempt === maxAttempts) break
+      }
+      if (!result || !result.ok) return failRun(next, result?.error ?? 'AI 执行失败。')
+      next = appendHistory(next, node.id, result.variables)
+      next = withTimestamp(next, { variables: { ...next.variables, ...result.variables } })
+      const routed = routeToNext(next, workflow, node, 'out')
+      if (routed.status === 'completed') return routed
+      next = routed
+      continue
+    }
+    if (isExternalNode(node)) return failRun(next, `节点「${node.title}」需要外部执行能力。`)
     const waiting = getWaitingState(node)
     if (waiting) return withTimestamp(next, { status: 'waiting', waiting, error: null })
     next = appendHistory(next, node.id)

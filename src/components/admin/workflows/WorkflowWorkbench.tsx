@@ -8,7 +8,8 @@ import { createEmptyWorkflow } from '@/lib/workflows/normalize'
 import { createWorkflowSaveCoordinator, type WorkflowSaveState } from '@/lib/workflows/persistence'
 import { createWorkflowRunSaveCoordinator, type WorkflowRunSaveState } from '@/lib/workflows/runPersistence'
 import { saveWorkflowRuns } from '@/lib/workflows/runs'
-import { advanceWorkflow, cancelWorkflow, resolveWaiting, startWorkflow } from '@/lib/workflows/runtime'
+import { executeWorkflowNode } from '@/lib/workflows/client/execution'
+import { advanceWorkflowAsync, cancelWorkflow, resolveWaiting, startWorkflow, type WorkflowAsyncStatus } from '@/lib/workflows/runtime'
 import type { WorkflowCanvasMetadata, WorkflowDocument, WorkflowNode, WorkflowNodeKind, WorkflowRun, WorkflowRunMetadata, WorkflowValue, WorkflowValueMap } from '@/lib/workflows/types'
 import { WorkflowInspector } from './WorkflowInspector'
 import { WorkflowCanvas } from './WorkflowCanvas'
@@ -51,6 +52,7 @@ export function WorkflowWorkbench({ initialMetadata, initialRuns, userId }: Work
   const [notice, setNotice] = useState<string | null>(null)
   const [saveState, setSaveState] = useState<WorkflowSaveState>({ pending: false, error: null })
   const [runSaveState, setRunSaveState] = useState<WorkflowRunSaveState>({ pending: false, error: null })
+  const [executionStatus, setExecutionStatus] = useState<WorkflowAsyncStatus | null>(null)
   const saveCoordinator = useMemo(() => createWorkflowSaveCoordinator(async (nextMetadata) => {
     const { error } = await createClient().auth.updateUser({ data: { workflow_canvas: nextMetadata } })
     return { error: error ? new Error(error.message) : null }
@@ -95,22 +97,46 @@ export function WorkflowWorkbench({ initialMetadata, initialRuns, userId }: Work
 
   const persistRun = (nextRun: WorkflowRun) => applyRunMetadata(saveWorkflowRuns(runMetadataRef.current, nextRun), nextRun)
 
+  const executeRun = (run: WorkflowRun, workflow: WorkflowDocument) => {
+    setExecutionStatus('executing')
+    void advanceWorkflowAsync(run, workflow, async (input) => {
+      const result = await executeWorkflowNode(input)
+      return result.ok
+        ? { ok: true, output: result.output, variables: result.variables }
+        : { ok: false, error: result.error, retryable: result.retryable }
+    }, { onStatus: (status) => setExecutionStatus(status) }).then((nextRun) => {
+      setExecutionStatus(null)
+      persistRun(nextRun)
+    }).catch(() => {
+      setExecutionStatus(null)
+      setNotice('AI 执行失败，请稍后重试。')
+    })
+  }
+
   const handleStartRun = (inputs: WorkflowValueMap) => {
     if (!activeWorkflow) return
-    persistRun(advanceWorkflow(startWorkflow(activeWorkflow, inputs), activeWorkflow))
+    const started = startWorkflow(activeWorkflow, inputs)
+    persistRun(started)
+    if (started.status === 'running') executeRun(started, activeWorkflow)
   }
 
   const handleResolveRun = (response: WorkflowValue) => {
     if (!activeWorkflow || !activeRun) return
     const resolved = resolveWaiting(activeRun, response)
-    persistRun(resolved.status === 'running' ? advanceWorkflow(resolved, activeWorkflow) : resolved)
+    persistRun(resolved)
+    if (resolved.status === 'running') executeRun(resolved, activeWorkflow)
   }
 
   const handleResumeRun = (runId: string) => {
     if (!activeWorkflow) return
     const run = runMetadataRef.current.runs.find((item) => item.id === runId)
     if (!run || run.workflowId !== activeWorkflow.id) return
-    persistRun(run.status === 'running' ? advanceWorkflow(run, activeWorkflow) : run)
+    if (run.status !== 'running') {
+      persistRun(run)
+      return
+    }
+    persistRun(run)
+    executeRun(run, activeWorkflow)
   }
 
   const handleCancelRun = () => {
@@ -175,7 +201,7 @@ export function WorkflowWorkbench({ initialMetadata, initialRuns, userId }: Work
          <WorkflowSidebar workflows={metadata.workflows} activeWorkflowId={activeWorkflow?.id ?? null} onSelectWorkflow={(workflowId) => { applyAction({ type: 'set-active', workflowId }); setSelectedNodeId(null); setSelectedNodeIds([]); setSelectedRunId(null) }} onCreateWorkflow={createWorkflow} onRenameWorkflow={handleRename} onDuplicateWorkflow={handleDuplicate} onDeleteWorkflow={handleDelete} onAddNode={handleAddNode} onUnavailable={setNotice} />
         <main className={`sg-workflow-canvas-shell${readOnly ? ' sg-workflow-canvas-shell--readonly' : ''}`} aria-label="流程画布" role="application">
           <div className="sg-workflow-canvas-toolbar"><span>{activeWorkflow?.name ?? '未命名流程'}</span><div className="sg-workflow-canvas-tools"><button type="button" className="sg-icon-btn" aria-label="撤销" title="撤销"><RotateCcw aria-hidden size={15} /></button><button type="button" className="sg-icon-btn" aria-label="重做" title="重做"><RotateCw aria-hidden size={15} /></button></div></div>
-          {mode === 'run' && activeWorkflow ? <WorkflowPlayer workflow={activeWorkflow} run={activeRun} recoverableRuns={recoverableRuns} onStart={handleStartRun} onResolve={handleResolveRun} onResume={handleResumeRun} onCancel={handleCancelRun} onRetrySave={() => runSaveCoordinator.retry()} saveError={runSaveState.error} /> : activeWorkflow?.nodes.length ? <WorkflowCanvas workflow={activeWorkflow} selectedNodeId={selectedNodeId} selectedNodeIds={selectedNodeIds} mode={mode} onSelectNode={(nodeId, additive) => { setSelectedNodeIds((current) => additive ? current.includes(nodeId) ? current.filter((id) => id !== nodeId) : [...current, nodeId] : [nodeId]); setSelectedNodeId(nodeId) }} onUpdateWorkflow={updateActiveWorkflow} onUpdateNodeTitle={handleUpdateNodeTitle} onRunBlock={setNotice} /> : <div className="sg-workflow-empty-canvas"><strong>从一个想法开始</strong><span>从左侧选择节点，或新建一个空白流程。</span><button type="button" className="sg-btn sg-btn--primary" onClick={createWorkflow}>新建空白流程</button></div>}
+          {mode === 'run' && activeWorkflow ? <WorkflowPlayer workflow={activeWorkflow} run={activeRun} recoverableRuns={recoverableRuns} onStart={handleStartRun} onResolve={handleResolveRun} onResume={handleResumeRun} onCancel={handleCancelRun} onRetrySave={() => runSaveCoordinator.retry()} saveError={runSaveState.error} executionStatus={executionStatus} /> : activeWorkflow?.nodes.length ? <WorkflowCanvas workflow={activeWorkflow} selectedNodeId={selectedNodeId} selectedNodeIds={selectedNodeIds} mode={mode} onSelectNode={(nodeId, additive) => { setSelectedNodeIds((current) => additive ? current.includes(nodeId) ? current.filter((id) => id !== nodeId) : [...current, nodeId] : [nodeId]); setSelectedNodeId(nodeId) }} onUpdateWorkflow={updateActiveWorkflow} onUpdateNodeTitle={handleUpdateNodeTitle} onRunBlock={setNotice} /> : <div className="sg-workflow-empty-canvas"><strong>从一个想法开始</strong><span>从左侧选择节点，或新建一个空白流程。</span><button type="button" className="sg-btn sg-btn--primary" onClick={createWorkflow}>新建空白流程</button></div>}
           {runReason ? <p className="sg-workflow-run-block" role="alert">{runReason}</p> : null}
         </main>
         <WorkflowInspector node={selectedNode} readOnly={readOnly} onUpdateNode={handleUpdateNode} />

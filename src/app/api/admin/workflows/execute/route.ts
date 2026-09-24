@@ -40,7 +40,7 @@ function parseRequestBody(value: unknown): ExecuteRequest | null {
   const runId = typeof value.runId === 'string' ? value.runId.trim() : ''
   const nodeId = typeof value.nodeId === 'string' ? value.nodeId.trim() : ''
   const attempt = value.attempt
-  if (!workflowId || !runId || !nodeId || !Number.isInteger(attempt) || attempt < 1 || attempt > 3) return null
+  if (!workflowId || !runId || !nodeId || typeof attempt !== 'number' || !Number.isInteger(attempt) || attempt < 1 || attempt > 3) return null
   if (!isValueMap(value.inputs) || !isValueMap(value.variables)) return null
   return { workflowId, runId, nodeId, inputs: value.inputs, variables: value.variables, attempt }
 }
