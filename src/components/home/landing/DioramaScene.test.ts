@@ -180,6 +180,25 @@ describe('diorama scene contract', () => {
     expect(styles).toContain('.sg-diorama-node:focus-visible')
   })
 
+  it('keeps homepage story nodes enabled by default', () => {
+    expect(source).toContain('showStoryNodes?: boolean')
+    expect(source).toContain('showStoryNodes = true')
+  })
+
+  it('supports authentication scene detail and camera status callbacks', () => {
+    expect(source).toContain('authMode?: boolean')
+    expect(source).toContain('onCameraStateChange')
+    expect(source).toContain('resetCameraKey?: number')
+  })
+
+  it('keeps authentication motion mode live after mount', () => {
+    expect(source).toContain('authModeRef.current')
+  })
+
+  it('allows auth pages to hide story navigation', () => {
+    expect(source).toContain('showStoryNodes &&')
+  })
+
   it('defines story descriptions and camera targets for each valley node', () => {
     expect(source).toContain('description:')
     expect(source).toContain('camera: { theta:')

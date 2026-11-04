@@ -6,7 +6,13 @@ import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { Sky } from 'three/examples/jsm/objects/Sky.js'
 
-interface DioramaSceneProps { fallbackSrc: string }
+interface DioramaSceneProps {
+  fallbackSrc: string
+  showStoryNodes?: boolean
+  authMode?: boolean
+  onCameraStateChange?: (state: { theta: number; phi: number; radius: number }) => void
+  resetCameraKey?: number
+}
 interface CameraTarget { theta: number; phi: number; radius: number; target: [number, number, number] }
 interface StoryNode { id: string; label: string; description: string; href: string; x: number; y: number; z: number; camera: CameraTarget }
 const DEFAULT_CAMERA_TARGET: CameraTarget = { theta: 0.35, phi: 1.12, radius: 7.2, target: [0, 0.55, 0] }
@@ -642,15 +648,29 @@ function setFallbackVisibility(root: THREE.Object3D, visible: boolean, part: 'ca
 
 interface AuthoredReveal { object: THREE.Object3D; baseScale: THREE.Vector3; startedAt: number | null }
 
-export function DioramaScene({ fallbackSrc }: DioramaSceneProps) {
+export function DioramaScene({
+  fallbackSrc,
+  showStoryNodes = true,
+  authMode = false,
+  onCameraStateChange,
+  resetCameraKey = 0,
+}: DioramaSceneProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const cameraStateCallbackRef = useRef(onCameraStateChange)
+  const resetCameraKeyRef = useRef(resetCameraKey)
+  const authModeRef = useRef(authMode)
   const [fallback, setFallback] = useState(false)
   const [zoom, setZoom] = useState(1)
   const [activeNode, setActiveNode] = useState<string | null>(null)
   const storySelectionRef = useRef<CameraTarget | null>(null)
   const storyPinnedRef = useRef(false)
   const selectStoryNode = (node: StoryNode) => { storySelectionRef.current = node.camera; storyPinnedRef.current = true; setActiveNode(node.id) }
-  const returnToPanorama = () => { storySelectionRef.current = DEFAULT_CAMERA_TARGET; storyPinnedRef.current = false; setActiveNode(null) }
+  const returnToPanorama = () => { storySelectionRef.current = DEFAULT_CAMERA_TARGET; storyPinnedRef.current = false; setActiveNode(null); onCameraStateChange?.({ theta: DEFAULT_CAMERA_TARGET.theta, phi: DEFAULT_CAMERA_TARGET.phi, radius: DEFAULT_CAMERA_TARGET.radius }) }
+  useEffect(() => {
+    cameraStateCallbackRef.current = onCameraStateChange
+    resetCameraKeyRef.current = resetCameraKey
+    authModeRef.current = authMode
+  }, [authMode, onCameraStateChange, resetCameraKey])
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -872,13 +892,31 @@ export function DioramaScene({ fallbackSrc }: DioramaSceneProps) {
     }
     const glows = garden.children.filter((object) => object.name === 'glow') as THREE.Mesh[]
     const fireflies = garden.children.filter((object) => object.name === 'firefly') as THREE.Mesh[]
-    const orbit = { theta: DEFAULT_CAMERA_TARGET.theta, phi: DEFAULT_CAMERA_TARGET.phi, radius: DEFAULT_CAMERA_TARGET.radius }; const lookTarget = new THREE.Vector3(...DEFAULT_CAMERA_TARGET.target); let cameraTarget: CameraTarget = DEFAULT_CAMERA_TARGET; let cameraTransitionActive = false; let dragging = false; let lastX = 0; let lastY = 0
+    const orbit = { theta: DEFAULT_CAMERA_TARGET.theta, phi: DEFAULT_CAMERA_TARGET.phi, radius: DEFAULT_CAMERA_TARGET.radius }; const lookTarget = new THREE.Vector3(...DEFAULT_CAMERA_TARGET.target); let cameraTarget: CameraTarget = DEFAULT_CAMERA_TARGET; let cameraTransitionActive = false; let dragging = false; let lastX = 0; let lastY = 0; let cameraInertiaTheta = 0; let cameraInertiaPhi = 0; let observedResetCameraKey = resetCameraKey
+    const emitCameraState = () => { cameraStateCallbackRef.current?.({ theta: orbit.theta, phi: orbit.phi, radius: orbit.radius }) }
     const updateCamera = () => { camera.position.set(orbit.radius * Math.sin(orbit.phi) * Math.sin(orbit.theta), orbit.radius * Math.cos(orbit.phi), orbit.radius * Math.sin(orbit.phi) * Math.cos(orbit.theta)); camera.lookAt(lookTarget) }
     updateCamera()
     const resize = () => { const width = canvas.clientWidth; const height = canvas.clientHeight; if (!width || !height) return; renderer.setSize(width, height, false); camera.aspect = width / height; camera.updateProjectionMatrix() }
     let frame = 0
     const render = () => {
       const elapsed = clock.getElapsedTime()
+      if (resetCameraKeyRef.current !== observedResetCameraKey) {
+        observedResetCameraKey = resetCameraKeyRef.current
+        orbit.theta = DEFAULT_CAMERA_TARGET.theta
+        orbit.phi = DEFAULT_CAMERA_TARGET.phi
+        orbit.radius = DEFAULT_CAMERA_TARGET.radius
+        lookTarget.set(...DEFAULT_CAMERA_TARGET.target)
+        cameraTarget = DEFAULT_CAMERA_TARGET
+        cameraTransitionActive = false
+        cameraInertiaTheta = 0
+        cameraInertiaPhi = 0
+        storySelectionRef.current = null
+        storyPinnedRef.current = false
+        setActiveNode(null)
+        setZoom(1)
+        updateCamera()
+        emitCameraState()
+      }
       const requestedCameraTarget = storySelectionRef.current
       if (requestedCameraTarget && requestedCameraTarget !== cameraTarget) { cameraTarget = requestedCameraTarget; cameraTransitionActive = true }
       if (cameraTransitionActive) {
@@ -899,6 +937,17 @@ export function DioramaScene({ fallbackSrc }: DioramaSceneProps) {
         }
         updateCamera()
       }
+      if (!dragging && authModeRef.current && ambientMotion > 0 && !cameraTransitionActive) {
+        cameraInertiaTheta *= 0.9
+        cameraInertiaPhi *= 0.9
+        if (Math.abs(cameraInertiaTheta) > 0.0001 || Math.abs(cameraInertiaPhi) > 0.0001) {
+          orbit.theta += cameraInertiaTheta
+          orbit.phi = THREE.MathUtils.clamp(orbit.phi + cameraInertiaPhi, 0.68, 1.55)
+          updateCamera()
+          emitCameraState()
+        }
+      }
+      if (authModeRef.current && ambientMotion > 0) garden.position.y = Math.sin(elapsed * 0.45) * 0.004
       updateReveals(elapsed)
       if (stream && streamMaterial) {
         streamMaterial.opacity = 0.76 + Math.sin(elapsed * 2.4) * 0.07 * ambientMotion
@@ -969,8 +1018,8 @@ export function DioramaScene({ fallbackSrc }: DioramaSceneProps) {
     }
     const interruptCameraTransition = () => { cameraTransitionActive = false; storySelectionRef.current = null; storyPinnedRef.current = false; cameraTarget = { theta: orbit.theta, phi: orbit.phi, radius: orbit.radius, target: [lookTarget.x, lookTarget.y, lookTarget.z] }; setActiveNode(null) }
     const down = (event: PointerEvent) => { interruptCameraTransition(); dragging = true; lastX = event.clientX; lastY = event.clientY; canvas.setPointerCapture(event.pointerId) }
-    const move = (event: PointerEvent) => { if (!dragging) return; orbit.theta -= (event.clientX - lastX) * 0.008; orbit.phi = THREE.MathUtils.clamp(orbit.phi - (event.clientY - lastY) * 0.006, 0.68, 1.55); lastX = event.clientX; lastY = event.clientY; updateCamera() }
-    const up = () => { dragging = false }; const wheel = (event: WheelEvent) => { event.preventDefault(); interruptCameraTransition(); orbit.radius = THREE.MathUtils.clamp(orbit.radius + event.deltaY * 0.004, 4.4, MAX_CAMERA_RADIUS); setZoom(MAX_CAMERA_RADIUS / orbit.radius); updateCamera() }
+    const move = (event: PointerEvent) => { if (!dragging) return; const deltaX = event.clientX - lastX; const deltaY = event.clientY - lastY; orbit.theta -= deltaX * 0.008; orbit.phi = THREE.MathUtils.clamp(orbit.phi - deltaY * 0.006, 0.68, 1.55); if (authModeRef.current && ambientMotion > 0) { cameraInertiaTheta = -deltaX * 0.0008; cameraInertiaPhi = -deltaY * 0.0006 }; lastX = event.clientX; lastY = event.clientY; updateCamera(); emitCameraState() }
+    const up = () => { dragging = false }; const wheel = (event: WheelEvent) => { event.preventDefault(); interruptCameraTransition(); orbit.radius = THREE.MathUtils.clamp(orbit.radius + event.deltaY * 0.004, 4.4, MAX_CAMERA_RADIUS); setZoom(MAX_CAMERA_RADIUS / orbit.radius); updateCamera(); emitCameraState() }
     const keydown = (event: KeyboardEvent) => { if (event.key === 'Escape' && storySelectionRef.current) returnToPanorama() }
     frame = requestAnimationFrame(render); const observer = new ResizeObserver(resize); observer.observe(canvas); resize()
     canvas.addEventListener('pointerdown', down); canvas.addEventListener('pointermove', move); canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up); canvas.addEventListener('wheel', wheel, { passive: false }); document.addEventListener('keydown', keydown)
@@ -978,5 +1027,5 @@ export function DioramaScene({ fallbackSrc }: DioramaSceneProps) {
   }, [])
   if (fallback) return <img className="sg-diorama-fallback" src={fallbackSrc} alt="数字庭院" />
   const activeStoryNode = nodes.find((node) => node.id === activeNode)
-  return <div className="sg-diorama" style={{ ['--sg-diorama-zoom' as string]: zoom }}><canvas ref={canvasRef} className="sg-diorama__canvas" aria-label="可旋转缩放的数字庭院" /><div className="sg-diorama__nodes" aria-label="庭院故事节点">{nodes.map((node) => <button key={node.id} type="button" data-story-node={node.id} className={`sg-diorama-node${activeNode === node.id || zoom >= node.z + 0.35 ? ' is-visible' : ''}`} style={{ left: `${node.x * 100}%`, top: `${node.y * 100}%`, zIndex: activeNode === node.id ? 2 : 1 }} onClick={() => selectStoryNode(node)} onMouseEnter={() => setActiveNode(node.id)} onMouseLeave={() => { if (!storyPinnedRef.current) setActiveNode(null) }} onFocus={() => selectStoryNode(node)} onBlur={() => { if (!storyPinnedRef.current) setActiveNode(null) }}><span className="sg-diorama-node__dot" aria-hidden /><span className="sg-diorama-node__label">{node.label}</span></button>)}</div>{activeStoryNode && <aside className="sg-diorama-story-panel" aria-live="polite" aria-label={`${activeStoryNode.label}区域说明`}><p className="sg-diorama-story-panel__eyebrow">庭院故事</p><h2>{activeStoryNode.label}</h2><p>{activeStoryNode.description}</p><div className="sg-diorama-story-panel__actions"><Link href={activeStoryNode.href} className="sg-btn sg-btn--primary">查看这个区域</Link><button type="button" className="sg-btn sg-btn--ghost" aria-label="Return to panorama" onClick={returnToPanorama}>返回全景</button></div></aside>}</div>
+  return <div className="sg-diorama" style={{ ['--sg-diorama-zoom' as string]: zoom }}><canvas ref={canvasRef} className="sg-diorama__canvas" aria-label="可旋转缩放的数字庭院" />{showStoryNodes && <><div className="sg-diorama__nodes" aria-label="庭院故事节点">{nodes.map((node) => <button key={node.id} type="button" data-story-node={node.id} className={`sg-diorama-node${activeNode === node.id || zoom >= node.z + 0.35 ? ' is-visible' : ''}`} style={{ left: `${node.x * 100}%`, top: `${node.y * 100}%`, zIndex: activeNode === node.id ? 2 : 1 }} onClick={() => selectStoryNode(node)} onMouseEnter={() => setActiveNode(node.id)} onMouseLeave={() => { if (!storyPinnedRef.current) setActiveNode(null) }} onFocus={() => selectStoryNode(node)} onBlur={() => { if (!storyPinnedRef.current) setActiveNode(null) }}><span className="sg-diorama-node__dot" aria-hidden /><span className="sg-diorama-node__label">{node.label}</span></button>)}</div>{activeStoryNode && <aside className="sg-diorama-story-panel" aria-live="polite" aria-label={`${activeStoryNode.label}区域说明`}><p className="sg-diorama-story-panel__eyebrow">庭院故事</p><h2>{activeStoryNode.label}</h2><p>{activeStoryNode.description}</p><div className="sg-diorama-story-panel__actions"><Link href={activeStoryNode.href} className="sg-btn sg-btn--primary">查看这个区域</Link><button type="button" className="sg-btn sg-btn--ghost" aria-label="Return to panorama" onClick={returnToPanorama}>返回全景</button></div></aside>}</>}</div>
 }
