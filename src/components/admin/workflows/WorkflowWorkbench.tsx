@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import { PageHeader, StatusMessage } from '@oxygen-design/patterns'
+import { Badge, Button } from '@oxygen-design/ui'
 import { Eye, Pencil, Play, RotateCcw, RotateCw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { addNode, duplicateWorkflow, getRunBlockReason, updateNode } from '@/lib/workflows/graph'
@@ -8,6 +10,7 @@ import { createEmptyWorkflow } from '@/lib/workflows/normalize'
 import { createWorkflowSaveCoordinator, type WorkflowSaveState } from '@/lib/workflows/persistence'
 import { createWorkflowRunSaveCoordinator, type WorkflowRunSaveState } from '@/lib/workflows/runPersistence'
 import { saveWorkflowRuns } from '@/lib/workflows/runs'
+import { saveWorkflowCanvas, saveWorkflowRuns as persistWorkflowRuns } from '@/lib/workflows/stateStore'
 import { executeWorkflowNode } from '@/lib/workflows/client/execution'
 import { advanceWorkflowAsync, cancelWorkflow, followWorkflowError, resolveWaiting, retryWorkflowNode, startWorkflow, type WorkflowAsyncStatus } from '@/lib/workflows/runtime'
 import type { WorkflowCanvasMetadata, WorkflowDocument, WorkflowNode, WorkflowNodeKind, WorkflowRun, WorkflowRunMetadata, WorkflowValue, WorkflowValueMap } from '@/lib/workflows/types'
@@ -56,13 +59,13 @@ export function WorkflowWorkbench({ initialMetadata, initialRuns, userId }: Work
   const executionControllerRef = useRef<AbortController | null>(null)
   const executionKeyRef = useRef<string | null>(null)
   const saveCoordinator = useMemo(() => createWorkflowSaveCoordinator(async (nextMetadata) => {
-    const { error } = await createClient().auth.updateUser({ data: { workflow_canvas: nextMetadata } })
-    return { error: error ? new Error(error.message) : null }
-  }, 450, setSaveState), [])
+    const { error } = await saveWorkflowCanvas(createClient(), userId, nextMetadata)
+    return { error: error ? new Error(error) : null }
+  }, 450, setSaveState), [userId])
   const runSaveCoordinator = useMemo(() => createWorkflowRunSaveCoordinator(async (nextRuns) => {
-    const { error } = await createClient().auth.updateUser({ data: { workflow_runs: nextRuns } })
-    return { error: error ? new Error(error.message) : null }
-  }, 450, setRunSaveState), [])
+    const { error } = await persistWorkflowRuns(createClient(), userId, nextRuns)
+    return { error: error ? new Error(error) : null }
+  }, 450, setRunSaveState), [userId])
   useEffect(() => () => {
     saveCoordinator.dispose()
     runSaveCoordinator.dispose()
@@ -229,25 +232,41 @@ export function WorkflowWorkbench({ initialMetadata, initialRuns, userId }: Work
 
   return (
     <div className="sg-workflow-page" data-workflow-user={userId}>
-      <header className="sg-workflow-header">
-        <div><p className="sg-admin-eyebrow">WORKFLOW WORKBENCH</p><h1>流程工作台</h1><p>把思考方式画出来，再逐步变成可执行流程。</p></div>
-        <div className="sg-workflow-header__actions">
-          <div className="sg-segmented" role="group" aria-label="工作模式">
-            <button type="button" className={mode === 'edit' ? 'sg-segmented__item sg-segmented__item--active' : 'sg-segmented__item'} onClick={() => changeMode('edit')}><Pencil aria-hidden size={14} />编辑</button>
-            <button type="button" className={mode === 'preview' ? 'sg-segmented__item sg-segmented__item--active' : 'sg-segmented__item'} onClick={() => changeMode('preview')}><Eye aria-hidden size={14} />预览</button>
-            <button type="button" className={mode === 'run' ? 'sg-segmented__item sg-segmented__item--active' : 'sg-segmented__item'} onClick={() => changeMode('run')}><Play aria-hidden size={14} />运行</button>
+      <PageHeader
+        className="sg-workflow-header"
+        title="流程工作台"
+        description="把思考方式画出来，再逐步变成可执行流程。"
+        actions={
+          <div className="sg-workflow-header__actions">
+            <div className="sg-workflow-mode-switch" role="group" aria-label="工作模式">
+              <Button type="button" size="sm" variant={mode === 'edit' ? 'secondary' : 'ghost'} onClick={() => changeMode('edit')}><Pencil aria-hidden size={14} />编辑</Button>
+              <Button type="button" size="sm" variant={mode === 'preview' ? 'secondary' : 'ghost'} onClick={() => changeMode('preview')}><Eye aria-hidden size={14} />预览</Button>
+              <Button type="button" size="sm" variant={mode === 'run' ? 'secondary' : 'ghost'} onClick={() => changeMode('run')}><Play aria-hidden size={14} />运行</Button>
+            </div>
+            {saveState.error ? (
+              <Button type="button" variant="link" size="sm" role="status" onClick={() => saveCoordinator.retry()}>
+                {saveLabel}
+              </Button>
+            ) : (
+              <Badge variant="secondary" role="status">{notice ?? saveLabel}</Badge>
+            )}
+            {runSaveState.error ? (
+              <Button type="button" variant="link" size="sm" role="status" onClick={() => runSaveCoordinator.retry()}>
+                {runSaveLabel}
+              </Button>
+            ) : runSaveLabel ? (
+              <Badge variant="success" role="status">{runSaveLabel}</Badge>
+            ) : null}
           </div>
-           {saveState.error ? <button type="button" className="sg-workflow-save-status sg-workflow-save-status--error" role="status" onClick={() => saveCoordinator.retry()}>{saveLabel}</button> : <span className="sg-workflow-save-status" role="status">{notice ?? saveLabel}</span>}
-           {runSaveState.error ? <button type="button" className="sg-workflow-save-status sg-workflow-save-status--error" role="status" onClick={() => runSaveCoordinator.retry()}>{runSaveLabel}</button> : runSaveLabel ? <span className="sg-workflow-save-status" role="status">{runSaveLabel}</span> : null}
-        </div>
-      </header>
+        }
+      />
 
       <div className="sg-workflow-layout">
          <WorkflowSidebar workflows={metadata.workflows} activeWorkflowId={activeWorkflow?.id ?? null} onSelectWorkflow={(workflowId) => { applyAction({ type: 'set-active', workflowId }); setSelectedNodeId(null); setSelectedNodeIds([]); setSelectedRunId(null) }} onCreateWorkflow={createWorkflow} onRenameWorkflow={handleRename} onDuplicateWorkflow={handleDuplicate} onDeleteWorkflow={handleDelete} onAddNode={handleAddNode} onUnavailable={setNotice} />
         <main className={`sg-workflow-canvas-shell${readOnly ? ' sg-workflow-canvas-shell--readonly' : ''}`} aria-label="流程画布" role="application">
           <div className="sg-workflow-canvas-toolbar"><span>{activeWorkflow?.name ?? '未命名流程'}</span><div className="sg-workflow-canvas-tools"><button type="button" className="sg-icon-btn" aria-label="撤销" title="撤销"><RotateCcw aria-hidden size={15} /></button><button type="button" className="sg-icon-btn" aria-label="重做" title="重做"><RotateCw aria-hidden size={15} /></button></div></div>
-          {mode === 'run' && activeWorkflow ? <WorkflowPlayer workflow={activeWorkflow} run={activeRun} recoverableRuns={recoverableRuns} onStart={handleStartRun} onResolve={handleResolveRun} onResume={handleResumeRun} onCancel={handleCancelRun} onRetrySave={() => runSaveCoordinator.retry()} saveError={runSaveState.error} executionStatus={executionStatus} canRetryCurrentNode={Boolean(activeRun?.currentNodeId && activeWorkflow.nodes.some((node) => node.id === activeRun.currentNodeId && node.kind === 'ai' && node.execution.mode === 'configured' && node.execution.provider === 'ai'))} canFollowErrorBranch={Boolean(activeRun?.currentNodeId && activeWorkflow.edges.some((edge) => edge.source.nodeId === activeRun.currentNodeId && edge.source.portId === 'error'))} onRetryCurrentNode={handleRetryCurrentNode} onFollowErrorBranch={handleFollowErrorBranch} /> : activeWorkflow?.nodes.length ? <WorkflowCanvas workflow={activeWorkflow} selectedNodeId={selectedNodeId} selectedNodeIds={selectedNodeIds} mode={mode} onSelectNode={(nodeId, additive) => { setSelectedNodeIds((current) => additive ? current.includes(nodeId) ? current.filter((id) => id !== nodeId) : [...current, nodeId] : [nodeId]); setSelectedNodeId(nodeId) }} onUpdateWorkflow={updateActiveWorkflow} onUpdateNodeTitle={handleUpdateNodeTitle} onRunBlock={setNotice} /> : <div className="sg-workflow-empty-canvas"><strong>从一个想法开始</strong><span>从左侧选择节点，或新建一个空白流程。</span><button type="button" className="sg-btn sg-btn--primary" onClick={createWorkflow}>新建空白流程</button></div>}
-          {runReason ? <p className="sg-workflow-run-block" role="alert">{runReason}</p> : null}
+           {mode === 'run' && activeWorkflow ? <WorkflowPlayer workflow={activeWorkflow} run={activeRun} recoverableRuns={recoverableRuns} onStart={handleStartRun} onResolve={handleResolveRun} onResume={handleResumeRun} onCancel={handleCancelRun} onRetrySave={() => runSaveCoordinator.retry()} saveError={runSaveState.error} executionStatus={executionStatus} canRetryCurrentNode={Boolean(activeRun?.currentNodeId && activeWorkflow.nodes.some((node) => node.id === activeRun.currentNodeId && node.kind === 'ai' && node.execution.mode === 'configured' && node.execution.provider === 'ai'))} canFollowErrorBranch={Boolean(activeRun?.currentNodeId && activeWorkflow.edges.some((edge) => edge.source.nodeId === activeRun.currentNodeId && edge.source.portId === 'error'))} onRetryCurrentNode={handleRetryCurrentNode} onFollowErrorBranch={handleFollowErrorBranch} /> : activeWorkflow?.nodes.length ? <WorkflowCanvas workflow={activeWorkflow} selectedNodeId={selectedNodeId} selectedNodeIds={selectedNodeIds} mode={mode} onSelectNode={(nodeId, additive) => { setSelectedNodeIds((current) => additive ? current.includes(nodeId) ? current.filter((id) => id !== nodeId) : [...current, nodeId] : [nodeId]); setSelectedNodeId(nodeId) }} onUpdateWorkflow={updateActiveWorkflow} onUpdateNodeTitle={handleUpdateNodeTitle} onRunBlock={setNotice} /> : <div className="sg-workflow-empty-canvas"><strong>从一个想法开始</strong><span>从左侧选择节点，或新建一个空白流程。</span><Button type="button" onClick={createWorkflow}>新建空白流程</Button></div>}
+           {runReason ? <StatusMessage className="sg-workflow-run-block" tone="error">{runReason}</StatusMessage> : null}
         </main>
         <WorkflowInspector node={selectedNode} readOnly={readOnly} onUpdateNode={handleUpdateNode} />
       </div>

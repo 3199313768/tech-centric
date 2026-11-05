@@ -1,9 +1,11 @@
 'use client'
 
-import Link from 'next/link'
 import Image from 'next/image'
+import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useRef, useState } from 'react'
+import { useRef, useState, type DragEventHandler } from 'react'
+import { AppShell, StatusMessage } from '@oxygen-design/patterns'
+import { Button, ConfigProvider, Typography } from '@oxygen-design/ui'
 import { BookOpen, Boxes, LayoutDashboard, Settings, Sparkles, Workflow } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -15,8 +17,10 @@ const ADMIN_NAV_ITEMS = [
   { href: '/admin/workflows', label: '流程工作台', icon: Workflow },
   { href: '/admin/settings', label: '系统设置', icon: Settings },
 ] as const
+
 type AdminNavItem = (typeof ADMIN_NAV_ITEMS)[number]
 type AdminNavHref = AdminNavItem['href']
+
 const ADMIN_NAV_METADATA_KEY = 'admin_nav_order'
 
 function restoreNavItems(initialOrder: readonly string[] | undefined): readonly AdminNavItem[] {
@@ -30,12 +34,53 @@ function restoreNavItems(initialOrder: readonly string[] | undefined): readonly 
   return restoredItems.length > 0 ? [...restoredItems, ...missingItems] : ADMIN_NAV_ITEMS
 }
 
+function isActivePath(pathname: string, href: AdminNavHref): boolean {
+  return pathname === href || (href !== '/admin' && pathname.startsWith(`${href}/`))
+}
+
+interface AdminNavLinkProps {
+  item: AdminNavItem
+  active: boolean
+  mobile?: boolean
+  onDragStart?: DragEventHandler<HTMLAnchorElement>
+  onDragEnd?: DragEventHandler<HTMLAnchorElement>
+  onDrop?: DragEventHandler<HTMLAnchorElement>
+}
+
+function AdminNavLink({ item, active, mobile = false, onDragStart, onDragEnd, onDrop }: AdminNavLinkProps) {
+  const Icon = item.icon
+
+  return (
+    <Button
+      asChild
+      variant={active ? 'secondary' : 'ghost'}
+      className="oxygen-admin-nav__link"
+      data-active={active ? 'true' : undefined}
+    >
+      <Link
+        href={item.href}
+        aria-current={active ? 'page' : undefined}
+        draggable={mobile ? false : undefined}
+        onDragStart={mobile ? undefined : onDragStart}
+        onDragEnd={mobile ? undefined : onDragEnd}
+        onDragOver={mobile ? undefined : (event) => event.preventDefault()}
+        onDrop={mobile ? undefined : onDrop}
+        title={mobile ? undefined : '拖动调整导航顺序'}
+      >
+        <Icon aria-hidden size={17} strokeWidth={1.8} />
+        <span>{item.label}</span>
+      </Link>
+    </Button>
+  )
+}
+
 export function AdminShell({ children, initialNavOrder }: { children: React.ReactNode; initialNavOrder?: readonly string[] }) {
   const pathname = usePathname()
   const [navItems, setNavItems] = useState<readonly AdminNavItem[]>(() => restoreNavItems(initialNavOrder))
   const [draggedHref, setDraggedHref] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const saveRequestRef = useRef(0)
+  const activeItem = navItems.find((item) => isActivePath(pathname, item.href)) ?? navItems[0]
 
   const handleDrop = (targetHref: string) => {
     if (!draggedHref || draggedHref === targetHref) return
@@ -53,53 +98,75 @@ export function AdminShell({ children, initialNavOrder }: { children: React.Reac
     })
   }
 
+  const renderNavigation = (mobile = false) => (
+    <nav className="oxygen-admin-nav" aria-label={mobile ? '移动端管理导航' : '管理端导航'}>
+      {navItems.map((item) => (
+        <AdminNavLink
+          key={item.href}
+          item={item}
+          active={isActivePath(pathname, item.href)}
+          mobile={mobile}
+          onDragStart={() => setDraggedHref(item.href)}
+          onDragEnd={() => setDraggedHref(null)}
+          onDrop={(event) => {
+            event.preventDefault()
+            handleDrop(item.href)
+            setDraggedHref(null)
+          }}
+        />
+      ))}
+    </nav>
+  )
+
   return (
-    <div className="sg-admin">
-      <aside className="sg-admin__sidebar">
-        <Link className="sg-admin__brand" href="/admin">
-          <span className="sg-admin__brand-mark" aria-hidden>
-            <Image
-              src="/spirit-garden/个人信使图标-彩色.png"
-              alt=""
-              width={34}
-              height={34}
-              priority
-            />
-          </span>
-          <span>
-            <strong>SpiritGarden</strong>
-            <small>管理工作台</small>
-          </span>
-        </Link>
-        <nav className="sg-admin__nav" aria-label="管理端导航">
-          {navItems.map(({ href, label, icon: Icon }) => (
-            <Link
-              className={`sg-admin__nav-link${pathname === href || (href !== '/admin' && pathname.startsWith(`${href}/`)) ? ' sg-admin__nav-link--active' : ''}`}
-              href={href}
-              key={href}
-              aria-current={pathname === href || (href !== '/admin' && pathname.startsWith(`${href}/`)) ? 'page' : undefined}
-              draggable
-              onDragStart={() => setDraggedHref(href)}
-              onDragEnd={() => setDraggedHref(null)}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault()
-                handleDrop(href)
-                setDraggedHref(null)
-              }}
-              title="拖动调整导航顺序"
-            >
-              <Icon aria-hidden size={17} strokeWidth={1.8} />
-              <span>{label}</span>
+    <ConfigProvider theme="light">
+      <AppShell
+        className="sg-admin oxygen-admin-shell"
+        title={activeItem.label}
+        sidebar={
+          <div className="oxygen-admin-sidebar">
+            <Link className="oxygen-admin-brand" href="/admin">
+              <span className="oxygen-admin-brand__mark" aria-hidden>
+                <Image
+                  src="/spirit-garden/个人信使图标-彩色.png"
+                  alt=""
+                  width={36}
+                  height={36}
+                  priority
+                />
+              </span>
+              <span>
+                <Typography.Title level={4}>SpiritGarden</Typography.Title>
+                <Typography.Text type="secondary">管理工作台</Typography.Text>
+              </span>
             </Link>
-          ))}
-        </nav>
-        {saveError ? <p className="sg-admin__nav-error" role="status">{saveError}</p> : null}
-        <Link className="sg-admin__back" href="/">
-          返回前台
-        </Link>
-      </aside>
-      <main className="sg-admin__main">{children}</main>
-    </div>
+            {renderNavigation()}
+            {saveError ? (
+              <StatusMessage title="导航顺序未保存" tone="error">
+                {saveError}
+              </StatusMessage>
+            ) : null}
+            <Button asChild variant="secondary" className="oxygen-admin-sidebar__back">
+              <Link href="/">返回前台</Link>
+            </Button>
+          </div>
+        }
+        mobileNavigation={
+          <div className="oxygen-admin-mobile-nav">
+            {renderNavigation(true)}
+            <Button asChild variant="secondary">
+              <Link href="/">返回前台</Link>
+            </Button>
+          </div>
+        }
+        topbarActions={
+          <Button asChild variant="ghost" size="sm">
+            <Link href="/">返回前台</Link>
+          </Button>
+        }
+      >
+        {children}
+      </AppShell>
+    </ConfigProvider>
   )
 }

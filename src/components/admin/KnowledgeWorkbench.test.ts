@@ -1,25 +1,40 @@
-import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { describe, expect, it } from 'vitest'
 
-const styles = readFileSync('src/app/globals.css', 'utf8')
+const source = readFileSync('src/components/admin/KnowledgeWorkbench.tsx', 'utf8')
+const pageSource = readFileSync('src/app/admin/knowledge/page.tsx', 'utf8')
 
-describe('knowledge workbench modal layout', () => {
-  it('uses half of the viewport for the admin knowledge dialog', () => {
-    expect(styles).toContain('.sg-admin-page > .sg-modal-backdrop .sg-modal-panel { width: 50vw;')
+describe('knowledge workbench Oxygen controls', () => {
+  it('uses Oxygen dialogs, form controls, states, and table', () => {
+    expect(source).toContain("from '@oxygen-design/patterns'")
+    expect(source).toContain("from '@oxygen-design/ui'")
+    for (const component of [
+      'AlertDialog',
+      'Button',
+      'Dialog',
+      'EmptyState',
+      'Field',
+      'Input',
+      'PageHeader',
+      'Select',
+      'StatusMessage',
+      'Table',
+      'Textarea',
+    ]) {
+      expect(source).toContain(component)
+    }
   })
 
-  it('does not duplicate the create action in the empty state', () => {
-    const source = readFileSync('src/components/admin/KnowledgeWorkbench.tsx', 'utf8')
-    expect(source).not.toContain("records.length === 0 ? '还没有知识记录。' : '没有符合条件的记录。'}</p><button")
-  })
-
-  it('uses the database-supported type options instead of free text', () => {
-    const source = readFileSync('src/components/admin/KnowledgeWorkbench.tsx', 'utf8')
+  it('preserves database-backed record types and removes raw admin controls', () => {
     expect(source).toContain('KB_RECORD_TYPES.map')
-    expect(source).not.toContain('value={draft.type} onChange={(event) => setDraft({ ...draft, type: event.target.value })}')
+    expect(source).not.toContain('sg-modal-backdrop')
+    expect(source).not.toContain('sg-admin-table')
+    expect(source).not.toContain('<select')
+    expect(source).not.toContain('<table')
   })
 
-  it('vertically centers every admin knowledge table cell', () => {
-    expect(styles).toContain('.sg-admin-table th, .sg-admin-table td { padding: 0.75rem 0.9rem; border-bottom: 1px solid color-mix(in srgb, var(--sg-ink) 9%, transparent); vertical-align: middle; }')
+  it('uses Oxygen status presentation when knowledge loading fails', () => {
+    expect(pageSource).toContain('StatusMessage')
+    expect(pageSource).not.toContain('sg-admin-state')
   })
 })

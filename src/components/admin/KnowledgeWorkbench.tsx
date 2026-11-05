@@ -1,6 +1,41 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { EmptyState, PageHeader, StatusMessage } from '@oxygen-design/patterns'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Field,
+  FieldControl,
+  FieldError,
+  FieldLabel,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Table,
+  Tag,
+  Textarea,
+  type TableColumn,
+} from '@oxygen-design/ui'
 import { createKbRecord, deleteKbRecord, updateKbRecord } from '@/lib/knowledge/actions'
 import { canStartDelete, filterKnowledgeRecords, parseKnowledgeTags, type KnowledgeFilters } from '@/lib/knowledge/admin'
 import { KB_RECORD_TYPES, isKbRecordType, type KbRecordType } from '@/lib/knowledge/constants'
@@ -26,6 +61,7 @@ export function KnowledgeWorkbench({ initialRecords }: KnowledgeWorkbenchProps) 
   const [isCreating, setIsCreating] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const mountedRef = useRef(true)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -38,19 +74,21 @@ export function KnowledgeWorkbench({ initialRecords }: KnowledgeWorkbenchProps) 
         event.preventDefault()
         searchRef.current?.focus()
       }
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !isSaving && !isDeleting) {
         setIsCreating(false)
         setEditingRecord(null)
         setDeletingId(null)
+        setError(null)
       }
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [isDeleting, isSaving])
 
   const types = useMemo(() => Array.from(new Set([DEFAULT_TYPE, ...records.map((record) => record.type)])), [records])
   const tags = useMemo(() => Array.from(new Set(records.flatMap((record) => record.tags ?? []))).sort(), [records])
   const visibleRecords = useMemo(() => filterKnowledgeRecords(records, filters), [records, filters])
+  const deletingRecord = deletingId ? records.find((record) => record.id === deletingId) ?? null : null
   const isDialogOpen = isCreating || editingRecord !== null
 
   const openCreate = () => {
@@ -103,12 +141,13 @@ export function KnowledgeWorkbench({ initialRecords }: KnowledgeWorkbenchProps) 
       if (result.record) setRecords((current) => [result.record as KbRecord, ...current])
     }
     setIsSaving(false)
-    closeDialog()
+    setIsCreating(false)
+    setEditingRecord(null)
   }
 
   const handleDelete = async (recordId: string) => {
-    if (!canStartDelete(deletingId, recordId)) return
-    setDeletingId(recordId)
+    if (isDeleting || !canStartDelete(deletingId, recordId)) return
+    setIsDeleting(true)
     setError(null)
     const result = await deleteKbRecord(recordId)
     if (!mountedRef.current) return
@@ -117,18 +156,218 @@ export function KnowledgeWorkbench({ initialRecords }: KnowledgeWorkbenchProps) 
     } else {
       setRecords((current) => current.filter((record) => record.id !== recordId))
     }
+    setIsDeleting(false)
     setDeletingId(null)
   }
 
-  return <div className="sg-admin-page">
-    <div className="sg-admin-toolbar">
-      <input ref={searchRef} className="sg-form-input" value={filters.keyword} onChange={(event) => setFilters({ ...filters, keyword: event.target.value })} placeholder="搜索知识内容" aria-label="搜索知识内容" />
-      <select className="sg-form-input" value={filters.type} onChange={(event) => setFilters({ ...filters, type: event.target.value })} aria-label="按类型筛选"><option value="">全部类型</option>{types.map((type) => <option key={type} value={type}>{type}</option>)}</select>
-      <select className="sg-form-input" value={filters.tag} onChange={(event) => setFilters({ ...filters, tag: event.target.value })} aria-label="按标签筛选"><option value="">全部标签</option>{tags.map((tag) => <option key={tag} value={tag}>{tag}</option>)}</select>
-      <button type="button" className="sg-btn sg-btn--primary" onClick={openCreate}>新增知识</button>
+  const columns: TableColumn<KbRecord>[] = [
+    {
+      key: 'type',
+      dataIndex: 'type',
+      title: '类型',
+      render: (value) => <Badge variant="secondary">{String(value)}</Badge>,
+    },
+    { key: 'content', dataIndex: 'content', title: '内容', ellipsis: true },
+    {
+      key: 'tags',
+      dataIndex: 'tags',
+      title: '标签',
+      render: (_, record) => record.tags?.length ? (
+        <span className="oxygen-admin-tag-list">
+          {record.tags.map((tag) => <Tag key={tag}>{tag}</Tag>)}
+        </span>
+      ) : '-',
+    },
+    {
+      key: 'created_at',
+      dataIndex: 'created_at',
+      title: '创建时间',
+      render: (value) => new Date(String(value)).toLocaleDateString('zh-CN'),
+    },
+    {
+      key: 'actions',
+      title: '操作',
+      render: (_, record) => (
+        <div className="oxygen-admin-row-actions">
+          <Button type="button" variant="link" size="sm" onClick={() => openEdit(record)}>编辑</Button>
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="oxygen-admin-action--danger"
+            onClick={() => {
+              setError(null)
+              setDeletingId(record.id)
+            }}
+          >
+            删除
+          </Button>
+        </div>
+      ),
+    },
+  ]
+
+  return (
+    <div className="oxygen-admin-page">
+      <PageHeader
+        title="知识库"
+        description="筛选、整理和维护站内知识记录。"
+        actions={<Button onClick={openCreate}>新增知识</Button>}
+      />
+
+      <Card>
+        <CardContent>
+          <div className="oxygen-admin-toolbar">
+            <Field className="oxygen-admin-toolbar__search">
+              <FieldLabel>搜索知识内容</FieldLabel>
+              <FieldControl>
+                <Input
+                  ref={searchRef}
+                  value={filters.keyword}
+                  onChange={(event) => setFilters({ ...filters, keyword: event.target.value })}
+                  placeholder="输入关键词"
+                />
+              </FieldControl>
+            </Field>
+
+            <Field>
+              <FieldLabel>类型</FieldLabel>
+              <Select
+                value={filters.type || 'all'}
+                onValueChange={(value) => setFilters({ ...filters, type: value === 'all' ? '' : value })}
+              >
+                <SelectTrigger aria-label="按类型筛选">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部类型</SelectItem>
+                  {types.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+
+            <Field>
+              <FieldLabel>标签</FieldLabel>
+              <Select
+                value={filters.tag || 'all'}
+                onValueChange={(value) => setFilters({ ...filters, tag: value === 'all' ? '' : value })}
+              >
+                <SelectTrigger aria-label="按标签筛选">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部标签</SelectItem>
+                  {tags.map((tag) => <SelectItem key={tag} value={tag}>{tag}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+          </div>
+        </CardContent>
+      </Card>
+
+      {error && !isDialogOpen && deletingId === null ? (
+        <StatusMessage title="操作失败" tone="error">{error}</StatusMessage>
+      ) : null}
+
+      {visibleRecords.length === 0 ? (
+        <Card>
+          <EmptyState
+            title={records.length === 0 ? '还没有知识记录' : '没有符合条件的记录'}
+            description={records.length === 0 ? '使用“新增知识”创建第一条记录。' : '调整搜索关键词或筛选项后再试。'}
+          />
+        </Card>
+      ) : (
+        <Table
+          columns={columns}
+          dataSource={visibleRecords}
+          rowKey="id"
+          emptyText={records.length === 0 ? '还没有知识记录。' : '没有符合条件的记录。'}
+        />
+      )}
+
+      <Dialog open={isDialogOpen} onOpenChange={(open) => { if (!open) closeDialog() }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingRecord ? '编辑知识' : '新增知识'}</DialogTitle>
+            <DialogDescription>填写知识类型、内容和标签；内容为必填项。</DialogDescription>
+          </DialogHeader>
+
+          <div className="oxygen-admin-form">
+            <Field required>
+              <FieldLabel>类型</FieldLabel>
+              <Select
+                value={draft.type}
+                onValueChange={(value) => {
+                  if (isKbRecordType(value)) setDraft({ ...draft, type: value })
+                }}
+              >
+                <SelectTrigger aria-label="知识类型">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {KB_RECORD_TYPES.map((recordType) => (
+                    <SelectItem key={recordType.id} value={recordType.id}>{recordType.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+
+            <Field required invalid={Boolean(error)}>
+              <FieldLabel>内容</FieldLabel>
+              <FieldControl>
+                <Textarea
+                  rows={6}
+                  value={draft.content}
+                  onChange={(event) => setDraft({ ...draft, content: event.target.value })}
+                />
+              </FieldControl>
+              <FieldError>{error}</FieldError>
+            </Field>
+
+            <Field>
+              <FieldLabel>标签</FieldLabel>
+              <FieldControl>
+                <Input
+                  value={draft.tags}
+                  onChange={(event) => setDraft({ ...draft, tags: event.target.value })}
+                  placeholder="多个标签用逗号分隔"
+                />
+              </FieldControl>
+            </Field>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="secondary" onClick={closeDialog} disabled={isSaving}>取消</Button>
+            <Button type="button" onClick={handleSave} loading={isSaving}>
+              {isSaving ? '保存中' : '保存'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={deletingId !== null} onOpenChange={(open) => { if (!open && !isDeleting) setDeletingId(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除知识？</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deletingRecord ? `“${deletingRecord.content.slice(0, 60)}”删除后无法恢复。` : '删除后无法恢复。'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={isDeleting}
+              onClick={(event) => {
+                event.preventDefault()
+                if (deletingId) void handleDelete(deletingId)
+              }}
+            >
+              {isDeleting ? '删除中' : '确认删除'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
-    {error && !isDialogOpen ? <p className="sg-admin-state sg-admin-state--error">{error}</p> : null}
-    {visibleRecords.length === 0 ? <div className="sg-admin-state"><p>{records.length === 0 ? '还没有知识记录。' : '没有符合条件的记录。'}</p></div> : <div className="sg-admin-table-wrap"><table className="sg-admin-table"><thead><tr><th>类型</th><th>内容</th><th>标签</th><th>创建时间</th><th>操作</th></tr></thead><tbody>{visibleRecords.map((record) => <tr key={record.id}><td>{record.type}</td><td>{record.content}</td><td>{record.tags?.join('、') || '-'}</td><td>{new Date(record.created_at).toLocaleDateString('zh-CN')}</td><td><button type="button" className="sg-btn sg-admin-action" onClick={() => openEdit(record)}>编辑</button>{deletingId === record.id ? <span className="sg-admin-delete-confirm"><button type="button" className="sg-btn sg-admin-action sg-admin-action--danger" onClick={() => handleDelete(record.id)}>确认删除</button><button type="button" className="sg-btn sg-admin-action" onClick={() => setDeletingId(null)}>取消</button></span> : <button type="button" className="sg-btn sg-admin-action" onClick={() => setDeletingId(record.id)}>删除</button>}</td></tr>)}</tbody></table></div>}
-    {isDialogOpen ? <div className="sg-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDialog() }}><div className="sg-modal-panel" role="dialog" aria-modal="true" aria-labelledby="knowledge-dialog-title"><h2 id="knowledge-dialog-title">{editingRecord ? '编辑知识' : '新增知识'}</h2><label className="sg-form-field"><span>类型</span><select className="sg-form-input" value={draft.type} onChange={(event) => { if (isKbRecordType(event.target.value)) setDraft({ ...draft, type: event.target.value }) }} aria-label="知识类型">{KB_RECORD_TYPES.map((recordType) => <option key={recordType.id} value={recordType.id}>{recordType.label}</option>)}</select></label><label className="sg-form-field"><span>内容</span><textarea className="sg-form-textarea" rows={6} value={draft.content} onChange={(event) => setDraft({ ...draft, content: event.target.value })} /></label><label className="sg-form-field"><span>标签</span><input className="sg-form-input" value={draft.tags} onChange={(event) => setDraft({ ...draft, tags: event.target.value })} placeholder="多个标签用逗号分隔" /></label>{error ? <p className="sg-kb-error sg-kb-error--inline">{error}</p> : null}<div className="sg-modal-actions"><button type="button" className="sg-btn sg-btn--ghost" onClick={closeDialog} disabled={isSaving}>取消</button><button type="button" className="sg-btn sg-btn--primary" onClick={handleSave} disabled={isSaving}>{isSaving ? '保存中' : '保存'}</button></div></div></div> : null}
-  </div>
+  )
 }

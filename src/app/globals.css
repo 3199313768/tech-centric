@@ -10625,7 +10625,8 @@ svg {
 .sg-workflow-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; }
 .sg-workflow-header h1 { margin: 0.25rem 0 0.35rem; font-size: clamp(1.45rem, 2vw, 1.95rem); }
 .sg-workflow-header p { margin: 0; color: var(--sg-ink); }
-.sg-workflow-header__actions { display: flex; align-items: center; gap: 0.8rem; }
+.sg-workflow-header__actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--oxygen-space-2); }
+.sg-workflow-mode-switch { display: inline-flex; gap: var(--oxygen-space-1); }
 .sg-segmented { display: inline-flex; align-items: center; border: 1px solid color-mix(in srgb, var(--sg-ink) 15%, transparent); border-radius: 0.45rem; padding: 0.2rem; background: color-mix(in srgb, var(--sg-parchment) 35%, var(--sg-cream)); }
 .sg-segmented__item { display: inline-flex; align-items: center; gap: 0.35rem; min-height: 2rem; padding: 0.35rem 0.6rem; border: 0; border-radius: 0.28rem; color: var(--sg-ink); background: transparent; cursor: pointer; font-size: 0.75rem; }
 .sg-segmented__item:hover, .sg-segmented__item:focus-visible { color: var(--sg-ink-strong); background: color-mix(in srgb, var(--sg-green-light) 24%, transparent); }
@@ -10757,3 +10758,240 @@ html.sg-spirit-cursor-active body .sg-admin input,
 html.sg-spirit-cursor-active body .sg-admin textarea,
 html.sg-spirit-cursor-active body .sg-admin select,
 html.sg-spirit-cursor-active body .sg-admin [contenteditable='true'] { cursor: text !important; }
+
+/* Oxygen admin shell */
+.oxygen-admin-shell {
+  display: grid;
+}
+
+.oxygen-admin-shell .oxygen-app-shell__content {
+  padding: 0;
+  max-width: none;
+}
+
+.oxygen-admin-shell .oxygen-app-shell__sidebar > .oxygen-admin-sidebar,
+.oxygen-admin-sidebar {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: var(--oxygen-space-6);
+  min-height: 100dvh;
+  padding: var(--oxygen-space-4);
+}
+
+.oxygen-admin-nav {
+  display: grid;
+  gap: var(--oxygen-space-1);
+}
+
+.oxygen-admin-nav__link {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.oxygen-admin-nav__link[data-active='true'] {
+  border-color: var(--oxygen-color-primary-border);
+}
+
+.oxygen-admin-brand {
+  align-items: center;
+  color: var(--oxygen-color-text);
+  display: flex;
+  gap: var(--oxygen-space-3);
+  text-decoration: none;
+}
+
+.oxygen-admin-brand > span:last-child {
+  display: grid;
+  gap: 2px;
+}
+
+.oxygen-admin-brand h4 {
+  margin: 0;
+}
+
+.oxygen-admin-brand__mark {
+  border: 1px solid var(--oxygen-color-border);
+  border-radius: 50%;
+  display: grid;
+  flex: 0 0 auto;
+  height: 36px;
+  overflow: hidden;
+  place-items: center;
+  width: 36px;
+}
+
+.oxygen-admin-sidebar__back {
+  margin-top: auto;
+}
+
+.oxygen-admin-page {
+  display: grid;
+  gap: var(--oxygen-space-6);
+  padding: var(--oxygen-space-6);
+}
+
+.oxygen-admin-denied {
+  align-items: center;
+  background: var(--oxygen-color-background);
+  color: var(--oxygen-color-text);
+  display: grid;
+  min-height: 100dvh;
+  padding: var(--oxygen-space-6);
+}
+
+.oxygen-admin-denied .oxygen-status-message {
+  margin-inline: auto;
+  max-width: 36rem;
+  width: 100%;
+}
+
+.oxygen-admin-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--oxygen-space-2);
+}
+
+.oxygen-admin-toolbar {
+  align-items: end;
+  display: grid;
+  gap: var(--oxygen-space-3);
+  grid-template-columns: minmax(16rem, 2fr) minmax(9rem, 1fr) minmax(9rem, 1fr);
+}
+
+.oxygen-admin-form {
+  display: grid;
+  gap: var(--oxygen-space-4);
+}
+
+.oxygen-admin-row-actions {
+  align-items: center;
+  display: flex;
+  gap: var(--oxygen-space-2);
+}
+
+.oxygen-admin-action--danger {
+  color: var(--oxygen-color-error);
+}
+
+.oxygen-admin-stat-grid {
+  display: grid;
+  gap: var(--oxygen-space-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.oxygen-admin-stat-link {
+  color: inherit;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.oxygen-admin-stat-card {
+  height: 100%;
+}
+
+.oxygen-admin-stat-card .oxygen-card__content {
+  align-items: center;
+  display: grid;
+  gap: var(--oxygen-space-3);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.oxygen-admin-stat-card__icon {
+  color: var(--oxygen-color-primary);
+  display: inline-flex;
+}
+
+.oxygen-admin-stat-card__icon svg {
+  height: 20px;
+  width: 20px;
+}
+
+.oxygen-admin-stat-card__arrow {
+  color: var(--oxygen-color-text-muted);
+}
+
+.oxygen-admin-card-heading {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.oxygen-admin-record-list {
+  display: grid;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.oxygen-admin-record-list li {
+  align-items: center;
+  border-top: 1px solid var(--oxygen-color-border-subtle);
+  display: grid;
+  gap: var(--oxygen-space-3);
+  grid-template-columns: minmax(4rem, auto) minmax(0, 1fr) auto;
+  padding: var(--oxygen-space-3) 0;
+}
+
+.oxygen-admin-record-list li:first-child {
+  border-top: 0;
+}
+
+.oxygen-admin-record-list time {
+  color: var(--oxygen-color-text-muted);
+  font-size: var(--oxygen-font-size-caption);
+  white-space: nowrap;
+}
+
+.oxygen-admin-table__secondary {
+  color: var(--oxygen-color-text-muted);
+  display: block;
+  font-size: var(--oxygen-font-size-caption);
+  margin-top: var(--oxygen-space-1);
+}
+
+.oxygen-admin-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--oxygen-space-1);
+}
+
+.oxygen-admin-link {
+  color: var(--oxygen-color-primary);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.oxygen-admin-mobile-nav {
+  display: grid;
+  gap: var(--oxygen-space-2);
+}
+
+@media (width <= 820px) {
+  .oxygen-admin-shell {
+    display: block;
+  }
+
+  .oxygen-admin-page {
+    padding: var(--oxygen-space-4);
+  }
+
+  .oxygen-admin-toolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .oxygen-admin-stat-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .oxygen-admin-record-list li {
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .oxygen-admin-record-list li > :nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

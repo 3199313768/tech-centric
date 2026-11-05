@@ -1,4 +1,8 @@
+import '@oxygen-design/ui/styles.css'
+import '@oxygen-design/patterns/styles.css'
 import { redirect } from 'next/navigation'
+import { StatusMessage } from '@oxygen-design/patterns'
+import { ConfigProvider } from '@oxygen-design/ui'
 import { AdminShell } from '@/components/admin/AdminShell'
 import { requireSuperAdmin } from '@/lib/auth/requireUser'
 
@@ -7,10 +11,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!user && error) redirect('/login?next=/admin')
   if (error) {
     return (
-      <div className="sg-admin-denied" role="alert">
-        <h1>暂时无法进入管理工作台</h1>
-        <p>{error}</p>
-      </div>
+      <ConfigProvider theme="light">
+        <main className="oxygen-admin-denied">
+          <StatusMessage title="暂时无法进入管理工作台" tone="error">
+            {error}
+          </StatusMessage>
+        </main>
+      </ConfigProvider>
     )
   }
   if (!user) redirect('/login?next=/admin')

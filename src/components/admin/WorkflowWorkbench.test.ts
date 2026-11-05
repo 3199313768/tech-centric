@@ -14,13 +14,14 @@ describe('admin workflow entry', () => {
     expect(pageSource).toContain('normalizeWorkflowCanvas')
     expect(pageSource).toContain('normalizeWorkflowRuns')
     expect(pageSource).toContain('WorkflowWorkbench')
-    expect(pageSource).toContain('user_metadata')
+    expect(pageSource).toContain('readWorkflowState')
   })
 
   it('keeps workflow runs in a separate metadata payload', () => {
     expect(pageSource).toContain('initialRuns')
-    expect(componentSource).toContain('workflow_runs')
-    expect(componentSource).toContain('workflow_canvas')
+    expect(componentSource).toContain('saveWorkflowCanvas')
+    expect(componentSource).toContain('persistWorkflowRuns')
+    expect(componentSource).not.toContain('updateUser')
     expect(componentSource).toContain('createWorkflowRunSaveCoordinator')
   })
 
@@ -44,5 +45,18 @@ describe('admin workflow entry', () => {
     expect(workbenchSources).toContain('连接${side ===')
     expect(workbenchSources).toContain('sg-workflow-canvas--readonly')
     expect(workbenchSources).toContain('getRunBlockReason')
+  })
+
+  it('migrates only the workflow outer UI to Oxygen', () => {
+    expect(componentSource).toContain("from '@oxygen-design/patterns'")
+    expect(componentSource).toContain("from '@oxygen-design/ui'")
+    expect(componentSource).toContain('<PageHeader')
+    expect(componentSource).not.toContain('sg-admin-eyebrow')
+    expect(pageSource).toContain('StatusMessage')
+    expect(pageSource).not.toContain('sg-admin-state')
+
+    for (const sourcePart of [sidebarSource, inspectorSource, canvasSource, nodeSource]) {
+      expect(sourcePart).not.toContain('@oxygen-design/')
+    }
   })
 })
